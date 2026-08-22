@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { FilterOption } from "@/lib/discovery-filters";
 
@@ -17,8 +17,31 @@ export type FilterDrawerProps = {
 const LIST_MASK =
   "linear-gradient(to bottom, transparent 0%, black 20%, black 80%, transparent 100%)";
 
-const SELECTED_GLOW =
+const CENTER_GLOW =
   "0 0 12px color-mix(in oklch, var(--accent) 55%, transparent), 0 0 28px color-mix(in oklch, var(--accent) 28%, transparent)";
+
+/** Half-height (px) of influence band for scale/opacity falloff */
+const FALLOFF_PX = 120;
+const SCALE_MIN = 0.82;
+const SCALE_MAX = 1.18;
+const OPACITY_MIN = 0.35;
+const OPACITY_MAX = 1;
+
+type ItemStyle = {
+  scale: number;
+  opacity: number;
+  isCenter: boolean;
+};
+
+function styleFromDistance(distancePx: number): ItemStyle {
+  const t = Math.min(1, Math.abs(distancePx) / FALLOFF_PX);
+  const ease = 1 - (1 - t) * (1 - t);
+  return {
+    scale: SCALE_MAX - ease * (SCALE_MAX - SCALE_MIN),
+    opacity: OPACITY_MAX - ease * (OPACITY_MAX - OPACITY_MIN),
+    isCenter: Math.abs(distancePx) < 28,
+  };
+}
 
 export function FilterDrawer({
   open,
@@ -30,7 +53,58 @@ export function FilterDrawer({
 }: FilterDrawerProps) {
   const reduceMotion = useReducedMotion();
   const listRef = useRef<HTMLUListElement>(null);
-  const selectedRef = useRef<HTMLButtonElement>(null);
+  const itemRefs = useRef<(HTMLLIElement | null)[]>([]);
+  const centerIndexRef = useRef(0);
+  const [centerIndex, setCenterIndex] = useState(0);
+  const [itemStyles, setItemStyles] = useState<ItemStyle[]>(() =>
+    options.map(() => ({
+      scale: SCALE_MIN,
+      opacity: OPACITY_MIN,
+      isCenter: false,
+    })),
+  );
+
+  const updateFromScroll = useCallback(() => {
+    const list = listRef.current;
+    if (!list) return;
+
+    const listRect = list.getBoundingClientRect();
+    const midY = listRect.top + listRect.height / 2;
+
+    let nearest = 0;
+    let nearestDist = Number.POSITIVE_INFINITY;
+    const next: ItemStyle[] = [];
+
+    for (let i = 0; i < options.length; i++) {
+      const el = itemRefs.current[i];
+      if (!el) {
+        next.push({ scale: SCALE_MIN, opacity: OPACITY_MIN, isCenter: false });
+        continue;
+      }
+      const rect = el.getBoundingClientRect();
+      const itemMid = rect.top + rect.height / 2;
+      const dist = itemMid - midY;
+      next.push(styleFromDistance(dist));
+      const abs = Math.abs(dist);
+      if (abs < nearestDist) {
+        nearestDist = abs;
+        nearest = i;
+      }
+    }
+
+    // Exactly one center highlight: nearest to mid-line
+    next.forEach((s, i) => {
+      s.isCenter = i === nearest;
+      if (s.isCenter) {
+        s.scale = SCALE_MAX;
+        s.opacity = OPACITY_MAX;
+      }
+    });
+
+    centerIndexRef.current = nearest;
+    setCenterIndex(nearest);
+    setItemStyles(next);
+  }, [options.length]);
 
   useEffect(() => {
     if (!open) return;
@@ -41,17 +115,62 @@ export function FilterDrawer({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
+  // Reset styles when options change; scroll committed selection to center on open
   useEffect(() => {
     if (!open) return;
+
+    itemRefs.current = itemRefs.current.slice(0, options.length);
+    const selectedIdx = Math.max(
+      0,
+      options.findIndex((o) => o.value === selectedValue),
+    );
+    centerIndexRef.current = selectedIdx;
+    setCenterIndex(selectedIdx);
+
     const id = window.requestAnimationFrame(() => {
-      selectedRef.current?.scrollIntoView({
+      const el = itemRefs.current[selectedIdx];
+      el?.scrollIntoView({
         block: "center",
         inline: "nearest",
         behavior: reduceMotion ? "auto" : "smooth",
       });
+      updateFromScroll();
     });
+
     return () => window.cancelAnimationFrame(id);
-  }, [open, selectedValue, reduceMotion]);
+  }, [open, selectedValue, options, reduceMotion, updateFromScroll]);
+
+  useEffect(() => {
+    if (!open) return;
+    const list = listRef.current;
+    if (!list) return;
+
+    let raf = 0;
+    const onScroll = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(updateFromScroll);
+    };
+
+    list.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    updateFromScroll();
+
+    return () => {
+      cancelAnimationFrame(raf);
+      list.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, [open, updateFromScroll]);
+
+  const commitIndex = (index: number) => {
+    const opt = options[index];
+    if (opt) onSelect(opt.value);
+  };
+
+  const handleItemClick = (index: number) => {
+    // Tap any item commits that value; center tap is primary confirm gesture
+    commitIndex(index);
+  };
 
   const duration = reduceMotion ? 0.01 : 0.28;
 
@@ -86,7 +205,7 @@ export function FilterDrawer({
 
             {/*
               Wheel rail: py-[40vh] lets first/last (and short lists) sit mid-shell.
-              Mask fades edges; snap proximity nudges without fighting free scroll.
+              Mask fades edges; scroll position drives magnified center preview.
             */}
             <ul
               ref={listRef}
@@ -96,24 +215,39 @@ export function FilterDrawer({
                 maskImage: LIST_MASK,
               }}
             >
-              {options.map((opt) => {
-                const selected = opt.value === selectedValue;
+              {options.map((opt, index) => {
+                const style = itemStyles[index] ?? {
+                  scale: SCALE_MIN,
+                  opacity: OPACITY_MIN,
+                  isCenter: false,
+                };
+                const active = style.isCenter || index === centerIndex;
                 return (
-                  <li key={opt.value} className="snap-center">
+                  <li
+                    key={opt.value}
+                    ref={(node) => {
+                      itemRefs.current[index] = node;
+                    }}
+                    className="snap-center"
+                  >
                     <button
-                      ref={selected ? selectedRef : undefined}
                       type="button"
-                      onClick={() => onSelect(opt.value)}
-                      className={`block w-full py-[13px] text-right font-sans text-[15px] leading-snug tracking-[-0.01em] transition-[color,text-shadow,opacity] duration-150 ${
-                        selected
-                          ? "text-accent opacity-100"
-                          : "text-foreground/70 opacity-80 hover:text-foreground hover:opacity-100"
+                      aria-current={active ? "true" : undefined}
+                      onClick={() => handleItemClick(index)}
+                      className={`block w-full origin-right py-[13px] text-right font-sans leading-snug tracking-[-0.01em] will-change-transform ${
+                        active
+                          ? "font-semibold text-accent"
+                          : "font-normal text-foreground"
                       }`}
-                      style={
-                        selected
-                          ? { textShadow: SELECTED_GLOW }
-                          : undefined
-                      }
+                      style={{
+                        transform: `scale(${style.scale})`,
+                        opacity: style.opacity,
+                        textShadow: active ? CENTER_GLOW : undefined,
+                        fontSize: active ? "17px" : "15px",
+                        transition: reduceMotion
+                          ? undefined
+                          : "transform 80ms linear, opacity 80ms linear, font-size 80ms linear, color 120ms ease",
+                      }}
                     >
                       {opt.label}
                     </button>

@@ -143,7 +143,7 @@ export const DEFAULT_FILTERS: DiscoveryFilters = {
   age: "any",
 };
 
-export const FILTER_KEYS: FilterKey[] = ["city", "country", "gender", "age"];
+export const FILTER_KEYS: FilterKey[] = ["country", "city", "gender", "age"];
 
 export function getFilterOption(
   key: FilterKey,

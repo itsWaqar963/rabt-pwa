@@ -19,7 +19,7 @@ export type FilterPillsProps = {
 
 export function FilterPills({ filters, onChange }: FilterPillsProps) {
   const [activeKey, setActiveKey] = useState<FilterKey | null>(null);
-  const [drawerKey, setDrawerKey] = useState<FilterKey>("city");
+  const [drawerKey, setDrawerKey] = useState<FilterKey>("country");
   const [shell, setShell] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -57,7 +57,7 @@ export function FilterPills({ filters, onChange }: FilterPillsProps) {
       <div
         role="group"
         aria-label="Discovery filters"
-        className="flex gap-1.5 overflow-x-auto px-[18px] py-2.5 [scrollbar-width:none] max-[360px]:px-3.5 [&::-webkit-scrollbar]:hidden"
+        className="flex w-full items-center justify-evenly gap-1.5 overflow-x-auto px-[18px] py-2.5 [scrollbar-width:none] max-[360px]:justify-center max-[360px]:gap-1 max-[360px]:px-3.5 [&::-webkit-scrollbar]:hidden"
       >
         {FILTER_KEYS.map((key) => {
           const code = getFilterCode(key, filters[key]);
@@ -70,7 +70,7 @@ export function FilterPills({ filters, onChange }: FilterPillsProps) {
               aria-expanded={isOpen}
               aria-label={`${FILTER_TITLES[key]}: ${code}`}
               onClick={() => openDrawer(key)}
-              className={`inline-flex h-8 shrink-0 items-center gap-1 rounded-full border px-2.5 font-mono text-[10px] uppercase tracking-[0.14em] transition-[border-color,background,color] duration-150 ${
+              className={`inline-flex h-8 shrink-0 items-center justify-center gap-1 rounded-full border px-2.5 font-mono text-[10px] uppercase tracking-[0.14em] transition-[border-color,background,color] duration-150 ${
                 isOpen
                   ? "border-accent bg-[color-mix(in_oklch,var(--accent)_16%,transparent)] text-accent"
                   : "border-[color-mix(in_oklch,var(--accent)_55%,var(--border))] bg-[color-mix(in_oklch,var(--accent)_10%,transparent)] text-foreground hover:border-accent hover:bg-[color-mix(in_oklch,var(--accent)_14%,transparent)]"
