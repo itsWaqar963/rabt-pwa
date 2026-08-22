@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { User } from "lucide-react";
 import { BottomNav } from "@/components/layout/BottomNav";
@@ -23,7 +23,25 @@ import {
 export default function DiscoverPage() {
   const [filters, setFilters] = useState<DiscoveryFilters>(DEFAULT_FILTERS);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [filterBarStuck, setFilterBarStuck] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
+  const filterSentinelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const root = mainRef.current;
+    const sentinel = filterSentinelRef.current;
+    if (!root || !sentinel) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setFilterBarStuck(!entry.isIntersecting);
+      },
+      { root, threshold: 0 },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, []);
 
   const feed = useMemo(
     () => filterDiscoveryUsers(DISCOVERY_USERS, filters),
@@ -77,7 +95,16 @@ export default function DiscoverPage() {
           </p>
         </section>
 
-        <section className="sticky top-0 z-30 -mx-[18px] border-y border-[color-mix(in_oklch,var(--accent)_25%,var(--border))] bg-black/60 backdrop-blur-md max-[360px]:-mx-3.5">
+        <div ref={filterSentinelRef} aria-hidden className="h-px w-full shrink-0" />
+        <section
+          className={[
+            "sticky top-0 z-30 -mx-[18px] border-b border-transparent bg-transparent max-[360px]:-mx-3.5",
+            "transition-[background-color,border-color,backdrop-filter,box-shadow] duration-200 ease-out",
+            filterBarStuck
+              ? "border-[color-mix(in_oklch,var(--accent)_35%,var(--border))] bg-black/80 shadow-lg backdrop-blur-md"
+              : "backdrop-blur-none shadow-none",
+          ].join(" ")}
+        >
           <FilterPills filters={filters} onChange={setFilters} />
         </section>
 
