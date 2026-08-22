@@ -28,6 +28,15 @@ export function FilterPills({ filters, onChange }: FilterPillsProps) {
     );
   }, []);
 
+  useEffect(() => {
+    if (activeKey === null) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [activeKey]);
+
   const closeDrawer = useCallback(() => setActiveKey(null), []);
 
   const handleSelect = useCallback(

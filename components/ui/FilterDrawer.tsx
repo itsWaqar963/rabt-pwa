@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Check, X } from "lucide-react";
 import type { FilterOption } from "@/lib/discovery-filters";
 
 export type FilterDrawerProps = {
@@ -14,6 +13,9 @@ export type FilterDrawerProps = {
   onClose: () => void;
 };
 
+const LIST_MASK =
+  "linear-gradient(to bottom, transparent 0%, black 8%, black 92%, transparent 100%)";
+
 export function FilterDrawer({
   open,
   title,
@@ -23,6 +25,7 @@ export function FilterDrawer({
   onClose,
 }: FilterDrawerProps) {
   const reduceMotion = useReducedMotion();
+  const selectedRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -33,75 +36,70 @@ export function FilterDrawer({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
+  useEffect(() => {
+    if (!open) return;
+    const id = window.requestAnimationFrame(() => {
+      selectedRef.current?.scrollIntoView({
+        block: "center",
+        behavior: reduceMotion ? "auto" : "smooth",
+      });
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [open, selectedValue, reduceMotion]);
+
   const duration = reduceMotion ? 0.01 : 0.28;
 
   return (
     <AnimatePresence>
       {open ? (
-        <div className="absolute inset-0 z-40" role="presentation">
+        <div className="absolute inset-0 z-50" role="presentation">
           <motion.button
             type="button"
-            aria-label="Close filter drawer"
-            className="absolute inset-0 backdrop-blur-md bg-black/40"
+            aria-label="Close filter picker"
+            className="absolute inset-0 bg-black/55 backdrop-blur-xl"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: reduceMotion ? 0.01 : 0.2 }}
             onClick={onClose}
           />
+
           <motion.aside
             role="dialog"
             aria-modal="true"
             aria-label={title}
-            className="absolute inset-y-0 right-0 flex w-[min(86%,20rem)] flex-col border-l border-border bg-[color-mix(in_oklch,var(--surface)_96%,var(--bg))] shadow-[-18px_0_48px_color-mix(in_oklch,var(--bg)_70%,transparent)]"
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
+            className="pointer-events-none absolute inset-y-0 right-0 flex w-[38%] max-w-[10.5rem] min-w-[7.5rem] flex-col pt-[max(20px,env(safe-area-inset-top))] pb-[max(16px,env(safe-area-inset-bottom))]"
+            initial={reduceMotion ? false : { x: 36, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={reduceMotion ? { opacity: 0 } : { x: 36, opacity: 0 }}
             transition={{ duration, ease: [0.22, 1, 0.36, 1] }}
           >
-            <header className="flex shrink-0 items-center justify-between gap-3 border-b border-[color-mix(in_oklch,var(--border)_80%,transparent)] px-4 pb-3 pt-[max(14px,env(safe-area-inset-top))]">
-              <h2 className="font-display text-lg leading-none text-foreground">
-                {title}
-              </h2>
-              <button
-                type="button"
-                aria-label="Close"
-                onClick={onClose}
-                className="grid size-9 place-items-center rounded-full border border-border text-muted transition-[border-color,color,background] duration-150 hover:border-foreground hover:text-foreground"
-              >
-                <X className="size-4" strokeWidth={1.6} aria-hidden />
-              </button>
-            </header>
+            <p className="pointer-events-none mb-2 shrink-0 pr-3 text-right font-mono text-[9px] uppercase tracking-[0.2em] text-muted/80">
+              {title}
+            </p>
 
-            <ul className="min-h-0 flex-1 list-none overflow-y-auto overscroll-contain px-2 py-2 [scrollbar-width:thin]">
+            <ul
+              className="pointer-events-auto min-h-0 flex-1 list-none overflow-y-auto overscroll-contain touch-pan-y pr-3 pl-1 [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden"
+              style={{
+                WebkitMaskImage: LIST_MASK,
+                maskImage: LIST_MASK,
+              }}
+            >
               {options.map((opt) => {
                 const selected = opt.value === selectedValue;
                 return (
                   <li key={opt.value}>
                     <button
+                      ref={selected ? selectedRef : undefined}
                       type="button"
                       onClick={() => onSelect(opt.value)}
-                      className={`flex w-full items-center justify-between gap-3 rounded-[12px] px-3 py-3 text-left transition-[background,border-color,color] duration-150 ${
+                      className={`block w-full py-[13px] text-right font-sans text-[15px] leading-snug tracking-[-0.01em] transition-colors duration-150 ${
                         selected
-                          ? "bg-[color-mix(in_oklch,var(--accent)_14%,transparent)] text-foreground"
-                          : "text-muted hover:bg-[color-mix(in_oklch,var(--fg)_5%,transparent)] hover:text-foreground"
+                          ? "text-accent [text-shadow:0_0_16px_color-mix(in_oklch,var(--accent)_42%,transparent)]"
+                          : "text-foreground/88 hover:text-foreground"
                       }`}
                     >
-                      <span className="flex min-w-0 flex-col gap-0.5">
-                        <span className="truncate text-[13px] font-medium leading-tight">
-                          {opt.label}
-                        </span>
-                        <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
-                          {opt.code}
-                        </span>
-                      </span>
-                      {selected ? (
-                        <Check
-                          className="size-4 shrink-0 text-accent"
-                          strokeWidth={2}
-                          aria-hidden
-                        />
-                      ) : null}
+                      {opt.label}
                     </button>
                   </li>
                 );
