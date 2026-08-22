@@ -1,0 +1,91 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import { FilterDrawer } from "@/components/ui/FilterDrawer";
+import {
+  FILTER_KEYS,
+  FILTER_OPTIONS,
+  FILTER_TITLES,
+  getFilterCode,
+  type DiscoveryFilters,
+  type FilterKey,
+} from "@/lib/discovery-filters";
+
+export type FilterPillsProps = {
+  filters: DiscoveryFilters;
+  onChange: (next: DiscoveryFilters) => void;
+};
+
+export function FilterPills({ filters, onChange }: FilterPillsProps) {
+  const [activeKey, setActiveKey] = useState<FilterKey | null>(null);
+  const [drawerKey, setDrawerKey] = useState<FilterKey>("city");
+  const [shell, setShell] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    setShell(
+      document.querySelector<HTMLElement>(".max-w-md.mx-auto.min-h-screen"),
+    );
+  }, []);
+
+  const closeDrawer = useCallback(() => setActiveKey(null), []);
+
+  const handleSelect = useCallback(
+    (value: string) => {
+      onChange({ ...filters, [drawerKey]: value });
+      setActiveKey(null);
+    },
+    [drawerKey, filters, onChange],
+  );
+
+  const openDrawer = (key: FilterKey) => {
+    setDrawerKey(key);
+    setActiveKey(key);
+  };
+
+  return (
+    <>
+      <div
+        role="group"
+        aria-label="Discovery filters"
+        className="flex gap-1.5 overflow-x-auto px-[18px] py-2.5 [scrollbar-width:none] max-[360px]:px-3.5 [&::-webkit-scrollbar]:hidden"
+      >
+        {FILTER_KEYS.map((key) => {
+          const code = getFilterCode(key, filters[key]);
+          const isOpen = activeKey === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              aria-haspopup="dialog"
+              aria-expanded={isOpen}
+              aria-label={`${FILTER_TITLES[key]}: ${code}`}
+              onClick={() => openDrawer(key)}
+              className={`inline-flex h-8 shrink-0 items-center gap-1 rounded-full border px-2.5 font-mono text-[10px] uppercase tracking-[0.14em] transition-[border-color,background,color] duration-150 ${
+                isOpen
+                  ? "border-accent bg-[color-mix(in_oklch,var(--accent)_16%,transparent)] text-accent"
+                  : "border-[color-mix(in_oklch,var(--accent)_55%,var(--border))] bg-[color-mix(in_oklch,var(--accent)_10%,transparent)] text-foreground hover:border-accent hover:bg-[color-mix(in_oklch,var(--accent)_14%,transparent)]"
+              }`}
+            >
+              {code}
+            </button>
+          );
+        })}
+      </div>
+
+      {shell
+        ? createPortal(
+            <FilterDrawer
+              open={activeKey !== null}
+              title={FILTER_TITLES[drawerKey]}
+              options={FILTER_OPTIONS[drawerKey]}
+              selectedValue={filters[drawerKey]}
+              onSelect={handleSelect}
+              onClose={closeDrawer}
+            />,
+            shell,
+          )
+        : null}
+    </>
+  );
+}

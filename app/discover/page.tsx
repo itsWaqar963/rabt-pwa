@@ -4,24 +4,14 @@ import { useState } from "react";
 import Link from "next/link";
 import { User } from "lucide-react";
 import { BottomNav } from "@/components/layout/BottomNav";
+import { FilterPills } from "@/components/ui/FilterPills";
 import { UserCard } from "@/components/ui/UserCard";
+import {
+  DEFAULT_FILTERS,
+  getFilterLabel,
+  type DiscoveryFilters,
+} from "@/lib/discovery-filters";
 
-const FILTER_OPTIONS = {
-  city: ["Lahore", "Karachi", "Islamabad"],
-  country: ["Pakistan", "UAE", "UK"],
-  gender: ["Any", "Women", "Men"],
-  age: ["Any", "18-24", "25-34", "35-44"],
-} as const;
-
-type Filters = {
-  city: (typeof FILTER_OPTIONS.city)[number];
-  country: (typeof FILTER_OPTIONS.country)[number];
-  gender: (typeof FILTER_OPTIONS.gender)[number];
-  age: (typeof FILTER_OPTIONS.age)[number];
-};
-
-const SELECT_CLASS =
-  "appearance-none inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-full border border-border bg-transparent bg-[length:0.7em] bg-[position:right_10px_center] bg-no-repeat px-[13px] pr-8 text-xs text-muted [color-scheme:dark] transition-[border-color,color,background] duration-150 hover:border-accent hover:bg-[color-mix(in_oklch,var(--accent)_14%,transparent)] hover:text-foreground focus:border-accent focus:bg-[color-mix(in_oklch,var(--accent)_14%,transparent)] focus:text-foreground focus:outline-none [background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none'%3E%3Cpath stroke='%23999' stroke-width='1.5' d='m1 1 5 5 5-5'/%3E%3C/svg%3E\")] [&_option]:bg-[var(--surface)] [&_option]:text-[var(--fg)]";
 const USERS = [
   {
     name: "Sana Khalid",
@@ -59,12 +49,13 @@ const USERS = [
 ];
 
 export default function DiscoverPage() {
-  const [filters, setFilters] = useState<Filters>({
-    city: "Lahore",
-    country: "Pakistan",
-    gender: "Any",
-    age: "Any",
-  });
+  const [filters, setFilters] = useState<DiscoveryFilters>(DEFAULT_FILTERS);
+  const cityLabel = getFilterLabel("city", filters.city);
+  const matched = USERS.filter((u) =>
+    u.tags.some((t) => t.toLowerCase() === cityLabel.toLowerCase()),
+  );
+  const feed = matched.length > 0 ? matched : USERS;
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_80%_4%,color-mix(in_oklch,var(--muted)_9%,transparent),transparent_20rem),var(--bg)]">
       <main className="relative z-[1] h-[100dvh] overflow-y-auto px-[18px] pb-[max(28px,env(safe-area-inset-bottom))] pt-[max(18px,env(safe-area-inset-top))] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -107,102 +98,8 @@ export default function DiscoverPage() {
           </p>
         </section>
 
-        <section className="-mx-[18px] overflow-hidden border-y border-[color-mix(in_oklch,var(--border)_70%,transparent)] max-[360px]:-mx-3.5">
-          <div
-            role="group"
-            aria-label="Discovery filters"
-            className="flex gap-2 overflow-x-auto px-[18px] py-3 [scrollbar-width:none] max-[360px]:px-3.5 [&::-webkit-scrollbar]:hidden"
-          >
-            <label className="sr-only" htmlFor="filter-city">
-              City
-            </label>
-            <select
-              id="filter-city"
-              className={SELECT_CLASS}
-              value={filters.city}
-              onChange={(e) =>
-                setFilters((f) => ({
-                  ...f,
-                  city: e.target.value as Filters["city"],
-                }))
-              }
-              style={{
-                color: "var(--fg)",
-                backgroundColor:
-                  "color-mix(in oklch, var(--accent) 14%, transparent)",
-                borderColor: "var(--accent)",
-              }}
-            >
-              {FILTER_OPTIONS.city.map((opt) => (
-                <option key={opt} value={opt}>
-                  City: {opt}
-                </option>
-              ))}
-            </select>
-
-            <label className="sr-only" htmlFor="filter-country">
-              Country
-            </label>
-            <select
-              id="filter-country"
-              className={SELECT_CLASS}
-              value={filters.country}
-              onChange={(e) =>
-                setFilters((f) => ({
-                  ...f,
-                  country: e.target.value as Filters["country"],
-                }))
-              }
-            >
-              {FILTER_OPTIONS.country.map((opt) => (
-                <option key={opt} value={opt}>
-                  Country: {opt}
-                </option>
-              ))}
-            </select>
-
-            <label className="sr-only" htmlFor="filter-gender">
-              Gender
-            </label>
-            <select
-              id="filter-gender"
-              className={SELECT_CLASS}
-              value={filters.gender}
-              onChange={(e) =>
-                setFilters((f) => ({
-                  ...f,
-                  gender: e.target.value as Filters["gender"],
-                }))
-              }
-            >
-              {FILTER_OPTIONS.gender.map((opt) => (
-                <option key={opt} value={opt}>
-                  Gender: {opt}
-                </option>
-              ))}
-            </select>
-
-            <label className="sr-only" htmlFor="filter-age">
-              Age Group
-            </label>
-            <select
-              id="filter-age"
-              className={SELECT_CLASS}
-              value={filters.age}
-              onChange={(e) =>
-                setFilters((f) => ({
-                  ...f,
-                  age: e.target.value as Filters["age"],
-                }))
-              }
-            >
-              {FILTER_OPTIONS.age.map((opt) => (
-                <option key={opt} value={opt}>
-                  Age: {opt}
-                </option>
-              ))}
-            </select>
-          </div>
+        <section className="-mx-[18px] border-y border-[color-mix(in_oklch,var(--border)_70%,transparent)] max-[360px]:-mx-3.5">
+          <FilterPills filters={filters} onChange={setFilters} />
         </section>
 
         <section>
@@ -211,17 +108,16 @@ export default function DiscoverPage() {
               Nearby intentions
             </h2>
             <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted">
-              3 clusters · {filters.city}
+              {feed.length} clusters · {cityLabel}
             </span>
           </div>
 
           <div className="grid gap-3 pb-[92px]">
-            {USERS.map((user) => (
+            {feed.map((user) => (
               <UserCard key={user.name} {...user} />
             ))}
           </div>
         </section>
-
       </main>
 
       <BottomNav />
