@@ -71,7 +71,7 @@ export default function MeetupsPage() {
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_80%_4%,color-mix(in_oklch,var(--muted)_9%,transparent),transparent_20rem),var(--bg)]">
-      <main className="relative z-[1] h-[100dvh] overflow-y-auto px-[18px] pb-[max(28px,env(safe-area-inset-bottom))] pt-[max(18px,env(safe-area-inset-top))] [scrollbar-width:none] max-[360px]:px-3.5 [&::-webkit-scrollbar]:hidden">
+      <main className="relative z-[1] h-[100dvh] overflow-y-auto px-[18px] pb-[max(88px,calc(env(safe-area-inset-bottom)+72px))] pt-[max(18px,env(safe-area-inset-top))] [scrollbar-width:none] max-[360px]:px-3.5 [&::-webkit-scrollbar]:hidden">
         <header className="relative z-10 flex min-h-12 items-center justify-between">
           <div className="flex items-baseline gap-2.5">
             <span
@@ -163,7 +163,7 @@ export default function MeetupsPage() {
           </div>
 
           {isExplore ? (
-            <div className="grid gap-3 pb-[92px]">
+            <div className="grid gap-3 pb-2">
               {MEETUPS.map((meetup) => (
                 <MeetupCard
                   key={meetup.id}
@@ -181,7 +181,7 @@ export default function MeetupsPage() {
               ))}
             </div>
           ) : (
-            <div className="border border-dashed border-border px-5 py-8 pb-[92px] text-center text-xs text-muted">
+            <div className="border border-dashed border-border px-5 py-8 pb-2 text-center text-xs text-muted">
               You have no upcoming meetups yet. Explore a gathering or broadcast
               one for your city.
             </div>

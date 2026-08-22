@@ -54,7 +54,7 @@ export default function DiscoverPage() {
     <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_80%_4%,color-mix(in_oklch,var(--muted)_9%,transparent),transparent_20rem),var(--bg)]">
       <main
         ref={mainRef}
-        className="relative z-[1] h-[100dvh] overflow-y-auto px-[18px] pb-[max(28px,env(safe-area-inset-bottom))] pt-[max(18px,env(safe-area-inset-top))] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="relative z-[1] h-[100dvh] overflow-y-auto px-[18px] pb-[max(88px,calc(env(safe-area-inset-bottom)+72px))] pt-[max(18px,env(safe-area-inset-top))] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         <header className="relative z-10 flex min-h-12 items-center justify-between">
           <div className="flex items-baseline gap-2.5">
@@ -98,10 +98,10 @@ export default function DiscoverPage() {
         <div ref={filterSentinelRef} aria-hidden className="h-px w-full shrink-0" />
         <section
           className={[
-            "sticky top-0 z-30 -mx-[18px] border-b border-transparent bg-transparent max-[360px]:-mx-3.5",
+            "sticky top-0 z-30 -mx-[18px] border-y border-[color-mix(in_oklch,var(--accent)_35%,var(--border))] bg-transparent max-[360px]:-mx-3.5",
             "transition-[background-color,border-color,backdrop-filter,box-shadow] duration-200 ease-out",
             filterBarStuck
-              ? "border-[color-mix(in_oklch,var(--accent)_35%,var(--border))] bg-black/80 shadow-lg backdrop-blur-md"
+              ? "border-[color-mix(in_oklch,var(--accent)_50%,var(--border))] bg-black/80 shadow-lg backdrop-blur-md"
               : "backdrop-blur-none shadow-none",
           ].join(" ")}
         >
@@ -118,7 +118,7 @@ export default function DiscoverPage() {
             </span>
           </div>
 
-          <div className="grid gap-3 pb-[92px]">
+          <div className="grid gap-3 pb-2">
             {feed.length === 0 ? (
               <EmptyClusters onReset={() => setFilters(DEFAULT_FILTERS)} />
             ) : (

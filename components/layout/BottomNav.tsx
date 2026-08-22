@@ -17,7 +17,7 @@ export function BottomNav() {
   return (
     <nav
       aria-label="Primary navigation"
-      className="absolute bottom-[max(14px,env(safe-area-inset-bottom))] left-1/2 z-[3] flex w-[min(calc(100%-36px),424px)] min-h-[58px] -translate-x-1/2 items-center justify-around rounded-[18px] border border-border bg-[color-mix(in_oklch,var(--surface)_90%,transparent)] p-1.5 shadow-[0_18px_45px_color-mix(in_oklch,var(--bg)_78%,transparent)] backdrop-blur-[16px]"
+      className="pointer-events-auto fixed bottom-[max(14px,env(safe-area-inset-bottom))] left-1/2 z-40 flex w-[min(calc(100%-36px),424px)] max-w-[calc(28rem-36px)] min-h-[58px] -translate-x-1/2 items-center justify-around rounded-[18px] border border-[color-mix(in_oklch,var(--accent)_35%,var(--border))] border-t-[color-mix(in_oklch,var(--accent)_45%,var(--border))] bg-black/80 p-1.5 shadow-[0_18px_45px_color-mix(in_oklch,var(--bg)_78%,transparent)] backdrop-blur-xl"
     >
       {TABS.map(({ href, label, Icon }) => {
         const active = pathname === href || pathname.startsWith(`${href}/`);
