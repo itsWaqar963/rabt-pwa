@@ -1,0 +1,42 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { CheckSquare, Home, User, Users } from "lucide-react";
+
+const TABS = [
+  { href: "/discover", label: "Discover", Icon: Home },
+  { href: "/meetups", label: "Meetups", Icon: Users },
+  { href: "/reflect", label: "Reflect", Icon: CheckSquare },
+  { href: "/profile", label: "Profile", Icon: User },
+] as const;
+
+export function BottomNav() {
+  const pathname = usePathname();
+
+  return (
+    <nav
+      aria-label="Primary navigation"
+      className="absolute bottom-[max(14px,env(safe-area-inset-bottom))] left-1/2 z-[3] flex w-[min(calc(100%-36px),424px)] min-h-[58px] -translate-x-1/2 items-center justify-around rounded-[18px] border border-border bg-[color-mix(in_oklch,var(--surface)_90%,transparent)] p-1.5 shadow-[0_18px_45px_color-mix(in_oklch,var(--bg)_78%,transparent)] backdrop-blur-[16px]"
+    >
+      {TABS.map(({ href, label, Icon }) => {
+        const active = pathname === href || pathname.startsWith(`${href}/`);
+        return (
+          <Link
+            key={href}
+            href={href}
+            className={`grid min-h-11 min-w-[54px] justify-items-center gap-0.5 rounded-xl px-2 py-[5px] font-mono text-[9px] transition-colors ${
+              active
+                ? "bg-[color-mix(in_oklch,var(--accent)_14%,transparent)] text-accent"
+                : "bg-transparent text-muted"
+            }`}
+            aria-current={active ? "page" : undefined}
+          >
+            <Icon className="size-[17px]" strokeWidth={1.6} aria-hidden />
+            {label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}

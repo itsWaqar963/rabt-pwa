@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+:root {
+  --bg: oklch(0.16 0.018 235);
+  --surface: oklch(0.205 0.021 228);
+  --fg: oklch(0.95 0.012 205);
+  --muted: oklch(0.68 0.035 210);
+  --border: oklch(0.31 0.026 220);
+  --accent: oklch(0.76 0.15 164);
+  --font-display: 'Geeza Pro', 'Noto Naskh Arabic', 'Iowan Old Style', Georgia, serif;
+  --font-body: 'Segoe UI', Tahoma, system-ui, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Mono', 'SFMono-Regular', Consolas, monospace;
+}
+
+@theme inline {
+  --color-background: var(--bg);
+  --color-surface: var(--surface);
+  --color-foreground: var(--fg);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --font-display: 'Geeza Pro', 'Noto Naskh Arabic', 'Iowan Old Style', Georgia, serif;
+  --font-body: 'Segoe UI', Tahoma, system-ui, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Mono', 'SFMono-Regular', Consolas, monospace;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+}
+
+@keyframes rabt-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rabt-orbit-dot {
+    animation: none !important;
+  }
+}
