@@ -7,6 +7,8 @@ import {
   FILTER_KEYS,
   FILTER_OPTIONS,
   FILTER_TITLES,
+  applyFilterChange,
+  getCityOptions,
   getFilterCode,
   type DiscoveryFilters,
   type FilterKey,
@@ -41,7 +43,7 @@ export function FilterPills({ filters, onChange }: FilterPillsProps) {
 
   const handleSelect = useCallback(
     (value: string) => {
-      onChange({ ...filters, [drawerKey]: value });
+      onChange(applyFilterChange(filters, drawerKey, value));
       setActiveKey(null);
     },
     [drawerKey, filters, onChange],
@@ -51,6 +53,11 @@ export function FilterPills({ filters, onChange }: FilterPillsProps) {
     setDrawerKey(key);
     setActiveKey(key);
   };
+
+  const drawerOptions =
+    drawerKey === "city"
+      ? getCityOptions(filters.country)
+      : FILTER_OPTIONS[drawerKey];
 
   return (
     <>
@@ -87,7 +94,7 @@ export function FilterPills({ filters, onChange }: FilterPillsProps) {
             <FilterDrawer
               open={activeKey !== null}
               title={FILTER_TITLES[drawerKey]}
-              options={FILTER_OPTIONS[drawerKey]}
+              options={drawerOptions}
               selectedValue={filters[drawerKey]}
               onSelect={handleSelect}
               onClose={closeDrawer}

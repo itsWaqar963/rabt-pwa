@@ -1,60 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { User } from "lucide-react";
 import { BottomNav } from "@/components/layout/BottomNav";
+import { EmptyClusters } from "@/components/ui/EmptyClusters";
 import { FilterPills } from "@/components/ui/FilterPills";
 import { UserCard } from "@/components/ui/UserCard";
 import {
   DEFAULT_FILTERS,
-  getFilterLabel,
+  getFilterMetaLabel,
   type DiscoveryFilters,
 } from "@/lib/discovery-filters";
-
-const USERS = [
-  {
-    name: "Sana Khalid",
-    initial: "س",
-    subline: "Design systems · 24",
-    intents: [
-      "Looking for a weekend physical meetup in Lahore",
-      "Building a focused study circle for product designers",
-    ],
-    tags: ["Lahore", "Model Town"],
-    avatarVariant: "default" as const,
-  },
-  {
-    name: "Hamza Rauf",
-    initial: "ح",
-    subline: "Civic tech · 26",
-    intents: [
-      "Looking for a small founder walk on Sunday",
-      "Want to meet builders shipping in public",
-    ],
-    tags: ["Lahore", "Gulberg"],
-    avatarVariant: "blue" as const,
-  },
-  {
-    name: "Maryam Saeed",
-    initial: "م",
-    subline: "Research · 23",
-    intents: [
-      "Searching for a women-led reading circle",
-      "Planning a quiet Sunday coffee meetup",
-    ],
-    tags: ["Lahore", "DHA"],
-    avatarVariant: "quiet" as const,
-  },
-];
+import {
+  DISCOVERY_USERS,
+  filterDiscoveryUsers,
+} from "@/lib/discovery-users";
 
 export default function DiscoverPage() {
   const [filters, setFilters] = useState<DiscoveryFilters>(DEFAULT_FILTERS);
-  const cityLabel = getFilterLabel("city", filters.city);
-  const matched = USERS.filter((u) =>
-    u.tags.some((t) => t.toLowerCase() === cityLabel.toLowerCase()),
+
+  const feed = useMemo(
+    () => filterDiscoveryUsers(DISCOVERY_USERS, filters),
+    [filters],
   );
-  const feed = matched.length > 0 ? matched : USERS;
+  const metaLabel = getFilterMetaLabel(filters);
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_80%_4%,color-mix(in_oklch,var(--muted)_9%,transparent),transparent_20rem),var(--bg)]">
@@ -108,14 +78,37 @@ export default function DiscoverPage() {
               Nearby intentions
             </h2>
             <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted">
-              {feed.length} clusters · {cityLabel}
+              {feed.length} clusters · {metaLabel}
             </span>
           </div>
 
           <div className="grid gap-3 pb-[92px]">
-            {feed.map((user) => (
-              <UserCard key={user.name} {...user} />
-            ))}
+            {feed.length === 0 ? (
+              <EmptyClusters onReset={() => setFilters(DEFAULT_FILTERS)} />
+            ) : (
+              feed.map(
+                ({
+                  name,
+                  initial,
+                  subline,
+                  intents,
+                  tags,
+                  avatarVariant,
+                  status,
+                }) => (
+                  <UserCard
+                    key={name}
+                    name={name}
+                    initial={initial}
+                    subline={subline}
+                    intents={intents}
+                    tags={tags}
+                    avatarVariant={avatarVariant}
+                    status={status}
+                  />
+                ),
+              )
+            )}
           </div>
         </section>
       </main>

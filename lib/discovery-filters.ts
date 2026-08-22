@@ -15,28 +15,12 @@ export const FILTER_TITLES: Record<FilterKey, string> = {
   age: "Age Group",
 };
 
-const CITY_OPTIONS: FilterOption[] = [
-  { value: "abu-dhabi", label: "Abu Dhabi", code: "AUH" },
-  { value: "cairo", label: "Cairo", code: "CAI" },
-  { value: "chicago", label: "Chicago", code: "CHI" },
-  { value: "doha", label: "Doha", code: "DOH" },
-  { value: "dubai", label: "Dubai", code: "DXB" },
-  { value: "houston", label: "Houston", code: "HOU" },
-  { value: "istanbul", label: "Istanbul", code: "IST" },
-  { value: "islamabad", label: "Islamabad", code: "ISB" },
-  { value: "jeddah", label: "Jeddah", code: "JED" },
-  { value: "karachi", label: "Karachi", code: "KHI" },
-  { value: "kuala-lumpur", label: "Kuala Lumpur", code: "KUL" },
-  { value: "lahore", label: "Lahore", code: "LHE" },
-  { value: "london", label: "London", code: "LON" },
-  { value: "manchester", label: "Manchester", code: "MAN" },
-  { value: "new-york", label: "New York", code: "NYC" },
-  { value: "riyadh", label: "Riyadh", code: "RUH" },
-  { value: "singapore", label: "Singapore", code: "SIN" },
-  { value: "sydney", label: "Sydney", code: "SYD" },
-  { value: "toronto", label: "Toronto", code: "YYZ" },
-  { value: "vancouver", label: "Vancouver", code: "YVR" },
-];
+/** Shared All sentinel — pills show ALL */
+export const ALL_OPTION: FilterOption = {
+  value: "all",
+  label: "All",
+  code: "ALL",
+};
 
 const COUNTRY_OPTIONS: FilterOption[] = [
   { value: "afghanistan", label: "Afghanistan", code: "AF" },
@@ -104,14 +88,55 @@ const COUNTRY_OPTIONS: FilterOption[] = [
   { value: "vietnam", label: "Vietnam", code: "VN" },
 ];
 
+/** Major cities A–Z per country (users + extras for cascade demo) */
+export const CITIES_BY_COUNTRY: Record<string, FilterOption[]> = {
+  australia: [
+    { value: "melbourne", label: "Melbourne", code: "MEL" },
+    { value: "sydney", label: "Sydney", code: "SYD" },
+  ],
+  canada: [
+    { value: "toronto", label: "Toronto", code: "YYZ" },
+    { value: "vancouver", label: "Vancouver", code: "YVR" },
+  ],
+  egypt: [{ value: "cairo", label: "Cairo", code: "CAI" }],
+  malaysia: [
+    { value: "kuala-lumpur", label: "Kuala Lumpur", code: "KUL" },
+  ],
+  pakistan: [
+    { value: "islamabad", label: "Islamabad", code: "ISB" },
+    { value: "karachi", label: "Karachi", code: "KHI" },
+    { value: "lahore", label: "Lahore", code: "LHE" },
+  ],
+  qatar: [{ value: "doha", label: "Doha", code: "DOH" }],
+  "saudi-arabia": [
+    { value: "jeddah", label: "Jeddah", code: "JED" },
+    { value: "riyadh", label: "Riyadh", code: "RUH" },
+  ],
+  singapore: [{ value: "singapore", label: "Singapore", code: "SIN" }],
+  turkey: [{ value: "istanbul", label: "Istanbul", code: "IST" }],
+  uae: [
+    { value: "abu-dhabi", label: "Abu Dhabi", code: "AUH" },
+    { value: "dubai", label: "Dubai", code: "DXB" },
+  ],
+  "united-kingdom": [
+    { value: "london", label: "London", code: "LON" },
+    { value: "manchester", label: "Manchester", code: "MAN" },
+  ],
+  "united-states": [
+    { value: "chicago", label: "Chicago", code: "CHI" },
+    { value: "houston", label: "Houston", code: "HOU" },
+    { value: "new-york", label: "New York", code: "NYC" },
+  ],
+};
+
 const GENDER_OPTIONS: FilterOption[] = [
-  { value: "any", label: "Any", code: "ANY" },
+  ALL_OPTION,
   { value: "men", label: "Men", code: "M" },
   { value: "women", label: "Women", code: "W" },
 ];
 
 const AGE_OPTIONS: FilterOption[] = [
-  { value: "any", label: "Any", code: "ANY" },
+  ALL_OPTION,
   { value: "18-24", label: "18–24", code: "18-24" },
   { value: "25-34", label: "25–34", code: "25-34" },
   { value: "35-44", label: "35–44", code: "35-44" },
@@ -121,26 +146,51 @@ function sortAlpha(options: FilterOption[]): FilterOption[] {
   return [...options].sort((a, b) => a.label.localeCompare(b.label));
 }
 
-function sortAnyFirst(options: FilterOption[]): FilterOption[] {
-  const any = options.filter((o) => o.value === "any");
+function sortAllFirst(options: FilterOption[]): FilterOption[] {
+  const all = options.filter((o) => o.value === "all");
   const rest = options
-    .filter((o) => o.value !== "any")
+    .filter((o) => o.value !== "all")
     .sort((a, b) => a.label.localeCompare(b.label));
-  return [...any, ...rest];
+  return [...all, ...rest];
 }
 
+/** City wheel options for active country */
+export function getCityOptions(country: string): FilterOption[] {
+  if (country === "all") {
+    const seen = new Map<string, FilterOption>();
+    for (const cities of Object.values(CITIES_BY_COUNTRY)) {
+      for (const city of cities) {
+        if (!seen.has(city.value)) seen.set(city.value, city);
+      }
+    }
+    return [ALL_OPTION, ...sortAlpha([...seen.values()])];
+  }
+  const cities = CITIES_BY_COUNTRY[country] ?? [];
+  return [ALL_OPTION, ...sortAlpha(cities)];
+}
+
+const ALL_CITIES: FilterOption[] = (() => {
+  const seen = new Map<string, FilterOption>();
+  for (const cities of Object.values(CITIES_BY_COUNTRY)) {
+    for (const city of cities) {
+      if (!seen.has(city.value)) seen.set(city.value, city);
+    }
+  }
+  return sortAlpha([...seen.values()]);
+})();
+
 export const FILTER_OPTIONS: Record<FilterKey, FilterOption[]> = {
-  city: sortAlpha(CITY_OPTIONS),
-  country: sortAlpha(COUNTRY_OPTIONS),
-  gender: sortAnyFirst(GENDER_OPTIONS),
-  age: sortAnyFirst(AGE_OPTIONS),
+  city: [ALL_OPTION, ...ALL_CITIES],
+  country: sortAllFirst([ALL_OPTION, ...COUNTRY_OPTIONS]),
+  gender: GENDER_OPTIONS,
+  age: AGE_OPTIONS,
 };
 
 export const DEFAULT_FILTERS: DiscoveryFilters = {
-  city: "lahore",
-  country: "pakistan",
-  gender: "any",
-  age: "any",
+  city: "all",
+  country: "all",
+  gender: "all",
+  age: "all",
 };
 
 export const FILTER_KEYS: FilterKey[] = ["country", "city", "gender", "age"];
@@ -149,6 +199,10 @@ export function getFilterOption(
   key: FilterKey,
   value: string,
 ): FilterOption | undefined {
+  if (key === "city") {
+    if (value === "all") return ALL_OPTION;
+    return ALL_CITIES.find((o) => o.value === value);
+  }
   return FILTER_OPTIONS[key].find((o) => o.value === value);
 }
 
@@ -158,4 +212,26 @@ export function getFilterCode(key: FilterKey, value: string): string {
 
 export function getFilterLabel(key: FilterKey, value: string): string {
   return getFilterOption(key, value)?.label ?? value;
+}
+
+/** Apply filter change; reset city→all when country cascade invalidates it */
+export function applyFilterChange(
+  filters: DiscoveryFilters,
+  key: FilterKey,
+  value: string,
+): DiscoveryFilters {
+  const next: DiscoveryFilters = { ...filters, [key]: value };
+  if (key === "country") {
+    const cityOk = getCityOptions(value).some((o) => o.value === next.city);
+    if (!cityOk) next.city = "all";
+  }
+  return next;
+}
+
+/** Meta location: city label, else country, else All */
+export function getFilterMetaLabel(filters: DiscoveryFilters): string {
+  if (filters.city !== "all") return getFilterLabel("city", filters.city);
+  if (filters.country !== "all")
+    return getFilterLabel("country", filters.country);
+  return "All";
 }
