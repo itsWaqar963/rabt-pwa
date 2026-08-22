@@ -6,6 +6,7 @@ import { User } from "lucide-react";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { EmptyClusters } from "@/components/ui/EmptyClusters";
 import { FilterPills } from "@/components/ui/FilterPills";
+import { ProfilePopup } from "@/components/ui/ProfilePopup";
 import { UserCard } from "@/components/ui/UserCard";
 import {
   DEFAULT_FILTERS,
@@ -15,16 +16,19 @@ import {
 import {
   DISCOVERY_USERS,
   filterDiscoveryUsers,
+  findDiscoveryUser,
 } from "@/lib/discovery-users";
 
 export default function DiscoverPage() {
   const [filters, setFilters] = useState<DiscoveryFilters>(DEFAULT_FILTERS);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
   const feed = useMemo(
     () => filterDiscoveryUsers(DISCOVERY_USERS, filters),
     [filters],
   );
   const metaLabel = getFilterMetaLabel(filters);
+  const selectedUser = findDiscoveryUser(DISCOVERY_USERS, selectedUserId);
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_80%_4%,color-mix(in_oklch,var(--muted)_9%,transparent),transparent_20rem),var(--bg)]">
@@ -86,34 +90,31 @@ export default function DiscoverPage() {
             {feed.length === 0 ? (
               <EmptyClusters onReset={() => setFilters(DEFAULT_FILTERS)} />
             ) : (
-              feed.map(
-                ({
-                  name,
-                  initial,
-                  subline,
-                  intents,
-                  tags,
-                  avatarVariant,
-                  status,
-                }) => (
-                  <UserCard
-                    key={name}
-                    name={name}
-                    initial={initial}
-                    subline={subline}
-                    intents={intents}
-                    tags={tags}
-                    avatarVariant={avatarVariant}
-                    status={status}
-                  />
-                ),
-              )
+              feed.map((user) => (
+                <UserCard
+                  key={user.id}
+                  name={user.name}
+                  initial={user.initial}
+                  subline={user.subline}
+                  intents={user.intents}
+                  tags={user.tags}
+                  avatarVariant={user.avatarVariant}
+                  status={user.status}
+                  onViewProfile={() => setSelectedUserId(user.id)}
+                />
+              ))
             )}
           </div>
         </section>
       </main>
 
       <BottomNav />
+
+      <ProfilePopup
+        user={selectedUser}
+        open={selectedUserId !== null && selectedUser !== null}
+        onClose={() => setSelectedUserId(null)}
+      />
     </div>
   );
 }

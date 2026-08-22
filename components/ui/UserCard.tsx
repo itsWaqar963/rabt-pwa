@@ -11,6 +11,7 @@ export type UserCardProps = {
   tags: string[];
   avatarVariant?: "default" | "blue" | "quiet";
   status?: string;
+  onViewProfile?: () => void;
 };
 
 const AVATAR_BG: Record<NonNullable<UserCardProps["avatarVariant"]>, string> = {
@@ -29,9 +30,12 @@ export function UserCard({
   tags,
   avatarVariant = "default",
   status = "active",
+  onViewProfile,
 }: UserCardProps) {
   const reducedMotion = useReducedMotion();
   const intentText = intents.join("  ·  ") || "";
+  const viewProfileClassName =
+    "inline-flex min-h-11 shrink-0 items-center rounded-[11px] border border-border bg-transparent px-3 text-[11px] text-foreground transition-[border-color,background] duration-150 hover:border-foreground hover:bg-[color-mix(in_oklch,var(--fg)_6%,transparent)]";
 
   return (
     <article className="relative overflow-hidden rounded-[22px] border border-border bg-[color-mix(in_oklch,var(--surface)_88%,transparent)] p-4 shadow-[0_18px_48px_color-mix(in_oklch,var(--bg)_76%,transparent)]">
@@ -98,12 +102,19 @@ export function UserCard({
             </span>
           ))}
         </div>
-        <Link
-          href="/profile"
-          className="inline-flex min-h-11 shrink-0 items-center rounded-[11px] border border-border bg-transparent px-3 text-[11px] text-foreground transition-[border-color,background] duration-150 hover:border-foreground hover:bg-[color-mix(in_oklch,var(--fg)_6%,transparent)]"
-        >
-          View profile
-        </Link>
+        {onViewProfile ? (
+          <button
+            type="button"
+            onClick={onViewProfile}
+            className={viewProfileClassName}
+          >
+            View profile
+          </button>
+        ) : (
+          <Link href="/profile" className={viewProfileClassName}>
+            View profile
+          </Link>
+        )}
       </div>
     </article>
   );

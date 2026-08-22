@@ -1,15 +1,25 @@
 import type { UserCardProps } from "@/components/ui/UserCard";
 import type { DiscoveryFilters } from "@/lib/discovery-filters";
 
+export type DiscoveryUserLinks = {
+  github?: string;
+  linkedin?: string;
+  contact?: string;
+};
+
 export type DiscoveryUser = UserCardProps & {
+  id: string;
   country: string;
   city: string;
   gender: "women" | "men";
   ageGroup: "18-24" | "25-34" | "35-44";
+  personalityScore: number;
+  links: DiscoveryUserLinks;
 };
 
 export const DISCOVERY_USERS: DiscoveryUser[] = [
   {
+    id: "sana-khalid",
     name: "Sana Khalid",
     initial: "س",
     subline: "Design systems · 24",
@@ -23,8 +33,15 @@ export const DISCOVERY_USERS: DiscoveryUser[] = [
     city: "lahore",
     gender: "women",
     ageGroup: "18-24",
+    personalityScore: 6,
+    links: {
+      github: "https://github.com",
+      linkedin: "https://linkedin.com",
+      contact: "https://wa.me/923001234567",
+    },
   },
   {
+    id: "hamza-rauf",
     name: "Hamza Rauf",
     initial: "ح",
     subline: "Civic tech · 26",
@@ -38,8 +55,15 @@ export const DISCOVERY_USERS: DiscoveryUser[] = [
     city: "lahore",
     gender: "men",
     ageGroup: "25-34",
+    personalityScore: 8,
+    links: {
+      github: "https://github.com",
+      linkedin: "https://linkedin.com",
+      contact: "https://wa.me/923001112233",
+    },
   },
   {
+    id: "maryam-saeed",
     name: "Maryam Saeed",
     initial: "م",
     subline: "Research · 23",
@@ -53,8 +77,14 @@ export const DISCOVERY_USERS: DiscoveryUser[] = [
     city: "lahore",
     gender: "women",
     ageGroup: "18-24",
+    personalityScore: 4,
+    links: {
+      linkedin: "https://linkedin.com",
+      contact: "https://wa.me/923004445566",
+    },
   },
   {
+    id: "bilal-khan",
     name: "Bilal Khan",
     initial: "ب",
     subline: "Fintech · 29",
@@ -68,8 +98,15 @@ export const DISCOVERY_USERS: DiscoveryUser[] = [
     city: "karachi",
     gender: "men",
     ageGroup: "25-34",
+    personalityScore: 7,
+    links: {
+      github: "https://github.com",
+      linkedin: "https://linkedin.com",
+      contact: "https://wa.me/923007778899",
+    },
   },
   {
+    id: "ayesha-noor",
     name: "Ayesha Noor",
     initial: "ع",
     subline: "Policy · 31",
@@ -83,8 +120,14 @@ export const DISCOVERY_USERS: DiscoveryUser[] = [
     city: "islamabad",
     gender: "women",
     ageGroup: "25-34",
+    personalityScore: 5,
+    links: {
+      linkedin: "https://linkedin.com",
+      contact: "https://wa.me/923009998877",
+    },
   },
   {
+    id: "omar-farid",
     name: "Omar Farid",
     initial: "ع",
     subline: "Product · 27",
@@ -98,8 +141,15 @@ export const DISCOVERY_USERS: DiscoveryUser[] = [
     city: "dubai",
     gender: "men",
     ageGroup: "25-34",
+    personalityScore: 9,
+    links: {
+      github: "https://github.com",
+      linkedin: "https://linkedin.com",
+      contact: "https://wa.me/971501234567",
+    },
   },
   {
+    id: "layla-hassan",
     name: "Layla Hassan",
     initial: "ل",
     subline: "Brand · 22",
@@ -113,8 +163,14 @@ export const DISCOVERY_USERS: DiscoveryUser[] = [
     city: "dubai",
     gender: "women",
     ageGroup: "18-24",
+    personalityScore: 3,
+    links: {
+      linkedin: "https://linkedin.com",
+      contact: "https://wa.me/971509876543",
+    },
   },
   {
+    id: "james-okonkwo",
     name: "James Okonkwo",
     initial: "ج",
     subline: "ML eng · 34",
@@ -128,8 +184,15 @@ export const DISCOVERY_USERS: DiscoveryUser[] = [
     city: "london",
     gender: "men",
     ageGroup: "25-34",
+    personalityScore: 6,
+    links: {
+      github: "https://github.com",
+      linkedin: "https://linkedin.com",
+      contact: "https://wa.me/447700900123",
+    },
   },
   {
+    id: "fatima-rahman",
     name: "Fatima Rahman",
     initial: "ف",
     subline: "Community · 28",
@@ -143,8 +206,14 @@ export const DISCOVERY_USERS: DiscoveryUser[] = [
     city: "london",
     gender: "women",
     ageGroup: "25-34",
+    personalityScore: 5,
+    links: {
+      linkedin: "https://linkedin.com",
+      contact: "https://wa.me/447700900456",
+    },
   },
   {
+    id: "noah-patel",
     name: "Noah Patel",
     initial: "ن",
     subline: "Systems · 36",
@@ -158,8 +227,15 @@ export const DISCOVERY_USERS: DiscoveryUser[] = [
     city: "chicago",
     gender: "men",
     ageGroup: "35-44",
+    personalityScore: 7,
+    links: {
+      github: "https://github.com",
+      linkedin: "https://linkedin.com",
+      contact: "https://wa.me/13125550123",
+    },
   },
   {
+    id: "sara-al-harbi",
     name: "Sara Al-Harbi",
     initial: "س",
     subline: "Architecture · 30",
@@ -173,6 +249,11 @@ export const DISCOVERY_USERS: DiscoveryUser[] = [
     city: "riyadh",
     gender: "women",
     ageGroup: "25-34",
+    personalityScore: 4,
+    links: {
+      linkedin: "https://linkedin.com",
+      contact: "https://wa.me/966501234567",
+    },
   },
 ];
 
@@ -195,4 +276,12 @@ export function filterDiscoveryUsers(
     }
     return true;
   });
+}
+
+export function findDiscoveryUser(
+  users: DiscoveryUser[],
+  id: string | null,
+): DiscoveryUser | null {
+  if (!id) return null;
+  return users.find((u) => u.id === id) ?? null;
 }
