@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { User } from "lucide-react";
 import { BottomNav } from "@/components/layout/BottomNav";
+import { ProfileHeaderButton } from "@/components/ui/ProfileHeaderButton";
 import { ReflectionCard } from "@/components/ui/ReflectionCard";
 
 const REVIEWS = [
@@ -44,13 +43,7 @@ export default function ReflectPage() {
               RABT
             </span>
           </div>
-          <Link
-            href="/profile"
-            aria-label="Open profile"
-            className="grid size-11 place-items-center rounded-full border border-border bg-[color-mix(in_oklch,var(--fg)_6%,transparent)] text-foreground transition-[background,border-color,transform] duration-150 hover:border-foreground hover:bg-[color-mix(in_oklch,var(--fg)_6%,transparent)] active:scale-95"
-          >
-            <User className="size-[18px]" strokeWidth={1.6} aria-hidden />
-          </Link>
+          <ProfileHeaderButton ariaLabel="Open profile" />
         </header>
 
         <section className="px-0.5 pb-[18px] pt-[27px]">

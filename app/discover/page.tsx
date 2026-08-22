@@ -1,12 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
-import { User } from "lucide-react";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { BackToTopFab } from "@/components/ui/BackToTopFab";
 import { EmptyClusters } from "@/components/ui/EmptyClusters";
 import { FilterPills } from "@/components/ui/FilterPills";
+import { ProfileHeaderButton } from "@/components/ui/ProfileHeaderButton";
 import { ProfilePopup } from "@/components/ui/ProfilePopup";
 import { UserCard } from "@/components/ui/UserCard";
 import {
@@ -72,13 +71,7 @@ export default function DiscoverPage() {
               RABT
             </span>
           </div>
-          <Link
-            href="/profile"
-            aria-label="Open your profile"
-            className="grid size-11 place-items-center rounded-full border border-border bg-[color-mix(in_oklch,var(--surface)_72%,transparent)] text-foreground transition-[background,border-color,transform] duration-150 hover:border-foreground hover:bg-[color-mix(in_oklch,var(--fg)_6%,transparent)] active:scale-95"
-          >
-            <User className="size-[19px]" strokeWidth={1.6} aria-hidden />
-          </Link>
+          <ProfileHeaderButton />
         </header>
 
         <section className="flex items-end justify-between gap-4 px-0.5 pb-[19px] pt-[27px]">
