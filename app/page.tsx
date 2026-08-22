@@ -1,25 +1,111 @@
 "use client";
 
-import { useState } from "react";
-import { motion } from "framer-motion";
+import { useCallback, useState } from "react";
+import { useRouter } from "next/navigation";
+import { AnimatePresence, motion } from "framer-motion";
 import { SplashScreen } from "@/components/ui/SplashScreen";
 import { PhilosophyCard } from "@/components/PhilosophyCard";
-import { IceBreakerQuiz } from "@/components/IceBreakerQuiz";
+import {
+  IceBreakerQuiz,
+  type OptionKey,
+  QUIZ_OPTIONS,
+} from "@/components/IceBreakerQuiz";
+import { LearningModal } from "@/components/ui/LearningModal";
+import { XpReward } from "@/components/ui/XpReward";
+
+type ModalMode = "discover" | "retry";
 
 export default function Home() {
+  const router = useRouter();
   const [splashDone, setSplashDone] = useState(false);
+  const [selected, setSelected] = useState<OptionKey | null>(null);
+  const [attempts, setAttempts] = useState(0);
+  const [quizLocked, setQuizLocked] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalMandatory, setModalMandatory] = useState(false);
+  const [modalMode, setModalMode] = useState<ModalMode>("discover");
+  const [showXp, setShowXp] = useState(false);
+  const [showSuccessCheck, setShowSuccessCheck] = useState(false);
+
+  const openModal = useCallback(
+    (mandatory: boolean, mode: ModalMode) => {
+      setModalMandatory(mandatory);
+      setModalMode(mode);
+      setModalOpen(true);
+    },
+    []
+  );
+
+  const handleSelect = useCallback(
+    (key: OptionKey) => {
+      if (quizLocked) return;
+
+      setQuizLocked(true);
+      setSelected(key);
+      setShowSuccessCheck(false);
+
+      const option = QUIZ_OPTIONS.find((o) => o.key === key);
+      const isCorrect = option?.correct ?? false;
+
+      if (isCorrect) {
+        if (attempts === 0) {
+          setShowXp(true);
+        } else {
+          setShowXp(true);
+          setShowSuccessCheck(true);
+          setTimeout(() => router.push("/discover"), 1600);
+        }
+        return;
+      }
+
+      setAttempts((n) => n + 1);
+      openModal(true, "retry");
+    },
+    [attempts, openModal, quizLocked, router]
+  );
+
+  const handleXpComplete = useCallback(() => {
+    setShowXp(false);
+    if (attempts === 0) {
+      openModal(false, "discover");
+    }
+  }, [attempts, openModal]);
+
+  const handleModalComplete = useCallback(() => {
+    setModalOpen(false);
+
+    if (modalMode === "discover") {
+      router.push("/discover");
+      return;
+    }
+
+    setSelected(null);
+    setQuizLocked(false);
+  }, [modalMode, router]);
 
   return (
     <>
       <SplashScreen onComplete={() => setSplashDone(true)} />
 
+      <AnimatePresence>
+        {showXp && <XpReward amount={50} onComplete={handleXpComplete} />}
+      </AnimatePresence>
+
+      <LearningModal
+        isOpen={modalOpen}
+        mandatory={modalMandatory}
+        videoFormat="vertical"
+        closeLabel={
+          modalMode === "discover" ? "Close / Skip" : "Continue to Quiz"
+        }
+        onComplete={handleModalComplete}
+      />
+
       <motion.main
         className="relative z-10 min-h-screen overflow-y-auto px-[18px] pb-7 pt-[max(18px,env(safe-area-inset-top))]"
         initial={{ opacity: 0, y: 10 }}
         animate={
-          splashDone
-            ? { opacity: 1, y: 0 }
-            : { opacity: 0, y: 10 }
+          splashDone ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }
         }
         transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1], delay: 0.18 }}
         aria-hidden={!splashDone}
@@ -76,7 +162,12 @@ export default function Home() {
         </section>
 
         <section className="relative z-10" aria-labelledby="quiz-title">
-          <IceBreakerQuiz />
+          <IceBreakerQuiz
+            selected={selected}
+            disabled={quizLocked}
+            showSuccessCheck={showSuccessCheck}
+            onSelect={handleSelect}
+          />
           <p className="flex justify-center gap-2 pt-[18px] font-mono text-[10px] tracking-[0.05em] text-muted">
             <span>●</span>
             <span>Reflection syncs with your local cluster</span>

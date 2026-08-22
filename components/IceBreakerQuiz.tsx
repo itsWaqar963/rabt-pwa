@@ -1,35 +1,43 @@
 "use client";
 
-import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowUpRight } from "lucide-react";
 
-const OPTIONS = [
+export const QUIZ_OPTIONS = [
   { key: "A", value: "Nizam", correct: false },
   { key: "B", value: "Deen", correct: true },
   { key: "C", value: "Tareeqa", correct: false },
 ] as const;
 
-type OptionKey = (typeof OPTIONS)[number]["key"];
+export type OptionKey = (typeof QUIZ_OPTIONS)[number]["key"];
 
-export function IceBreakerQuiz() {
-  const [selected, setSelected] = useState<OptionKey | null>(null);
+type IceBreakerQuizProps = {
+  selected: OptionKey | null;
+  disabled?: boolean;
+  showSuccessCheck?: boolean;
+  onSelect: (key: OptionKey) => void;
+};
 
+export function IceBreakerQuiz({
+  selected,
+  disabled = false,
+  showSuccessCheck = false,
+  onSelect,
+}: IceBreakerQuizProps) {
   return (
     <article className="rounded-[24px] border border-border bg-surface p-6 shadow-[0_24px_70px_color-mix(in_oklch,var(--bg)_86%,transparent)]">
       <div className="mb-5 flex items-center justify-between gap-4">
         <p className="font-mono text-[10px] uppercase tracking-[0.13em] text-muted">
-          ICE-BREAKER · 1 OF 3
+          ICE-BREAKER · 1 OF 1
         </p>
         <div
           className="h-[3px] w-[74px] overflow-hidden rounded-full bg-border"
           role="progressbar"
           aria-label="Quiz progress"
           aria-valuemin={0}
-          aria-valuemax={3}
+          aria-valuemax={1}
           aria-valuenow={1}
         >
-          <div className="h-full w-[34%] bg-accent" />
+          <div className="h-full w-full bg-accent" />
         </div>
       </div>
 
@@ -41,7 +49,7 @@ export function IceBreakerQuiz() {
       </h2>
 
       <div className="grid gap-2.5" role="group" aria-label="Answer choices">
-        {OPTIONS.map((opt) => {
+        {QUIZ_OPTIONS.map((opt) => {
           const isSelected = selected === opt.key;
           const showCorrect = isSelected && opt.correct;
           const showWrong = isSelected && !opt.correct;
@@ -50,10 +58,11 @@ export function IceBreakerQuiz() {
             <button
               key={opt.key}
               type="button"
-              onClick={() => setSelected(opt.key)}
+              disabled={disabled}
+              onClick={() => onSelect(opt.key)}
               className={[
-                "grid min-h-[54px] w-full grid-cols-[34px_1fr_24px] items-center gap-3 rounded-full border px-[14px] py-2 pl-[9px] text-left text-foreground transition-[transform,border-color,background] duration-150",
-                "active:scale-[0.985]",
+                "grid min-h-[54px] w-full grid-cols-[34px_1fr_24px] items-center gap-3 rounded-full border px-[14px] py-2 pl-[9px] text-left text-foreground transition-[transform,border-color,background,opacity] duration-150",
+                disabled ? "cursor-not-allowed opacity-70" : "active:scale-[0.985]",
                 showCorrect
                   ? "border-accent bg-[color-mix(in_oklch,var(--accent)_14%,transparent)]"
                   : showWrong
@@ -72,10 +81,7 @@ export function IceBreakerQuiz() {
                 {opt.key}
               </span>
               <span className="font-medium">{opt.value}</span>
-              <span
-                className="text-center text-base text-muted"
-                aria-hidden
-              >
+              <span className="text-center text-base text-muted" aria-hidden>
                 {showCorrect ? (
                   <span className="text-accent">✓</span>
                 ) : showWrong ? (
@@ -88,29 +94,20 @@ export function IceBreakerQuiz() {
       </div>
 
       <AnimatePresence>
-        {selected ? (
+        {showSuccessCheck && (
           <motion.div
-            key="feedback"
             role="status"
             aria-live="polite"
-            initial={{ opacity: 0, y: 7 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 4 }}
-            transition={{ duration: 0.22, ease: "easeOut" }}
-            className="pt-4"
+            initial={{ opacity: 0, scale: 0.85 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+            className="mt-5 flex items-center justify-center gap-2 rounded-[14px] border border-[color-mix(in_oklch,var(--accent)_48%,var(--border))] bg-[color-mix(in_oklch,var(--accent)_10%,transparent)] py-3 font-mono text-xs uppercase tracking-[0.1em] text-accent"
           >
-            <p className="mb-3 text-[13px] text-muted">
-              Close, but the Quranic concept reaches beyond structure.
-            </p>
-            <button
-              type="button"
-              className="flex min-h-12 w-full items-center justify-between rounded-[14px] border border-border bg-transparent px-[15px] text-[13px] font-semibold text-foreground transition-colors hover:border-foreground hover:bg-[color-mix(in_oklch,var(--fg)_6%,transparent)]"
-            >
-              Want to know the deeper concept?
-              <ArrowUpRight className="size-4 shrink-0 opacity-80" aria-hidden />
-            </button>
+            <span className="text-lg">✓</span>
+            Correct — welcome to ربط
           </motion.div>
-        ) : null}
+        )}
       </AnimatePresence>
     </article>
   );
