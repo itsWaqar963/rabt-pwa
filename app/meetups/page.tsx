@@ -1,54 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { MeetupCard } from "@/components/ui/MeetupCard";
+import {
+  DISCOVERY_USERS,
+  getHostedMeetups,
+} from "@/lib/discovery-users";
 
 type Tab = "explore" | "events";
-
-const MEETUPS = [
-  {
-    id: "maghrib-read",
-    kind: "Physical gathering · study",
-    title: "After Maghrib: Read & Reflect",
-    status: "6 spots left",
-    description:
-      "A quiet reading circle for people making space for better questions and better work.",
-    location: "Jamia Masjid, Model Town",
-    when: "Saturday, 24 Aug · 7:30 PM",
-    organizerName: "Sana Khalid",
-    organizerRole: "Design systems",
-  },
-  {
-    id: "civic-tech-walk",
-    kind: "Physical gathering · builders",
-    title: "Sunday Civic Tech Walk",
-    status: "4 spots left",
-    description:
-      "Walk, talk, and trade notes on the local problems worth building for.",
-    location: "Racecourse Park, Lahore",
-    when: "Sunday, 25 Aug · 8:00 AM",
-    organizerName: "Hamza Rauf",
-    organizerRole: "Civic tech",
-  },
-  {
-    id: "make-small",
-    kind: "Physical gathering · coffee",
-    title: "Make Something Small",
-    status: "8 spots left",
-    description:
-      "A low-pressure cafe session for sharing what you are making and what is stuck.",
-    location: "Second Cup, Gulberg III",
-    when: "Tuesday, 27 Aug · 6:30 PM",
-    organizerName: "Maryam Saeed",
-    organizerRole: "Research",
-  },
-] as const;
 
 export default function MeetupsPage() {
   const [activeTab, setActiveTab] = useState<Tab>("explore");
   const [requestedIds, setRequestedIds] = useState<Set<string>>(new Set());
   const [broadcastAck, setBroadcastAck] = useState(false);
+
+  const hostedMeetups = useMemo(
+    () => getHostedMeetups(DISCOVERY_USERS),
+    [],
+  );
 
   function toggleRequest(id: string) {
     setRequestedIds((prev) => {
@@ -158,13 +128,15 @@ export default function MeetupsPage() {
               {isExplore ? "Near you" : "Your calendar"}
             </h2>
             <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted">
-              {isExplore ? "3 meetups · Lahore" : "No saved meetups"}
+              {isExplore
+                ? `${hostedMeetups.length} meetups · hosts`
+                : "No saved meetups"}
             </span>
           </div>
 
           {isExplore ? (
             <div className="grid gap-3 pb-2">
-              {MEETUPS.map((meetup) => (
+              {hostedMeetups.map((meetup) => (
                 <MeetupCard
                   key={meetup.id}
                   kind={meetup.kind}

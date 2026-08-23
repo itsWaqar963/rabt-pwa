@@ -7,6 +7,14 @@ export type DiscoveryUserLinks = {
   contact?: string;
 };
 
+export type DiscoveryMeetup = {
+  id: string;
+  title?: string;
+  venue: string;
+  when: string;
+  description?: string;
+};
+
 export type DiscoveryUser = UserCardProps & {
   id: string;
   country: string;
@@ -15,6 +23,20 @@ export type DiscoveryUser = UserCardProps & {
   ageGroup: "18-24" | "25-34" | "35-44";
   personalityScore: number;
   links: DiscoveryUserLinks;
+  meetup?: DiscoveryMeetup;
+};
+
+export type HostedMeetup = {
+  id: string;
+  kind: string;
+  title: string;
+  status: string;
+  description: string;
+  location: string;
+  when: string;
+  organizerName: string;
+  organizerRole: string;
+  hostUserId: string;
 };
 
 export const DISCOVERY_USERS: DiscoveryUser[] = [
@@ -39,6 +61,14 @@ export const DISCOVERY_USERS: DiscoveryUser[] = [
       linkedin: "https://linkedin.com",
       contact: "https://wa.me/923001234567",
     },
+    meetup: {
+      id: "maghrib-read",
+      title: "After Maghrib: Read & Reflect",
+      venue: "Jamia Masjid Model Town",
+      when: "Saturday · 7:30 PM",
+      description:
+        "A quiet reading circle for people making space for better questions and better work.",
+    },
   },
   {
     id: "hamza-rauf",
@@ -60,6 +90,14 @@ export const DISCOVERY_USERS: DiscoveryUser[] = [
       github: "https://github.com",
       linkedin: "https://linkedin.com",
       contact: "https://wa.me/923001112233",
+    },
+    meetup: {
+      id: "civic-tech-walk",
+      title: "Sunday Civic Tech Walk",
+      venue: "Racecourse Park, Lahore",
+      when: "Sunday · 8:00 AM",
+      description:
+        "Walk, talk, and trade notes on the local problems worth building for.",
     },
   },
   {
@@ -104,6 +142,14 @@ export const DISCOVERY_USERS: DiscoveryUser[] = [
       linkedin: "https://linkedin.com",
       contact: "https://wa.me/923007778899",
     },
+    meetup: {
+      id: "karachi-founders-breakfast",
+      title: "Karachi Founders Breakfast",
+      venue: "Clifton Beach Cafe",
+      when: "Saturday · 9:00 AM",
+      description:
+        "Low-pressure breakfast for payment-ops and fintech builders swapping notes.",
+    },
   },
   {
     id: "ayesha-noor",
@@ -146,6 +192,14 @@ export const DISCOVERY_USERS: DiscoveryUser[] = [
       github: "https://github.com",
       linkedin: "https://linkedin.com",
       contact: "https://wa.me/971501234567",
+    },
+    meetup: {
+      id: "marina-maker-friday",
+      title: "Friday Maker Meetup",
+      venue: "Marina Walk Pavilion",
+      when: "Friday · 6:00 PM",
+      description:
+        "Bring a WIP, critique kindly, leave with one next step.",
     },
   },
   {
@@ -190,6 +244,14 @@ export const DISCOVERY_USERS: DiscoveryUser[] = [
       linkedin: "https://linkedin.com",
       contact: "https://wa.me/447700900123",
     },
+    meetup: {
+      id: "london-ai-ethics-walk",
+      title: "AI Ethics Walk",
+      venue: "Shoreditch Park",
+      when: "Sunday · 10:00 AM",
+      description:
+        "A thoughtful walk for builders who care how models land in the world.",
+    },
   },
   {
     id: "fatima-rahman",
@@ -232,6 +294,14 @@ export const DISCOVERY_USERS: DiscoveryUser[] = [
       github: "https://github.com",
       linkedin: "https://linkedin.com",
       contact: "https://wa.me/13125550123",
+    },
+    meetup: {
+      id: "chicago-infra-coffee",
+      title: "Infra Coffee",
+      venue: "River North Roasters",
+      when: "Thursday · 5:30 PM",
+      description:
+        "Distributed systems debate over coffee — bring a war story.",
     },
   },
   {
@@ -284,4 +354,26 @@ export function findDiscoveryUser(
 ): DiscoveryUser | null {
   if (!id) return null;
   return users.find((u) => u.id === id) ?? null;
+}
+
+export function getHostedMeetups(users: DiscoveryUser[]): HostedMeetup[] {
+  return users.flatMap((user) => {
+    if (!user.meetup) return [];
+    const role = user.subline.split(" · ")[0]?.trim() || user.subline;
+    return [
+      {
+        id: user.meetup.id,
+        kind: "Physical gathering · host",
+        title: user.meetup.title ?? `${user.name}'s meetup`,
+        status: "Open",
+        description:
+          user.meetup.description ?? user.intents[0] ?? "Hosted meetup",
+        location: user.meetup.venue,
+        when: user.meetup.when,
+        organizerName: user.name,
+        organizerRole: role,
+        hostUserId: user.id,
+      },
+    ];
+  });
 }

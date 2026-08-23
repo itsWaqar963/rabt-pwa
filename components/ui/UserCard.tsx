@@ -1,7 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import { Calendar, MapPin } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
+
+export type UserCardMeetup = {
+  id: string;
+  title?: string;
+  venue: string;
+  when: string;
+  description?: string;
+};
 
 export type UserCardProps = {
   name: string;
@@ -11,6 +20,12 @@ export type UserCardProps = {
   tags: string[];
   avatarVariant?: "default" | "blue" | "quiet";
   status?: string;
+  personalityScore?: number;
+  cityLabel?: string;
+  countryLabel?: string;
+  meetup?: UserCardMeetup;
+  primaryAcked?: boolean;
+  onPrimaryAction?: () => void;
   onViewProfile?: () => void;
 };
 
@@ -22,6 +37,10 @@ const AVATAR_BG: Record<NonNullable<UserCardProps["avatarVariant"]>, string> = {
     "radial-gradient(circle at 70% 20%, color-mix(in oklch, var(--fg) 28%, var(--surface)), transparent 32%), radial-gradient(circle at 28% 78%, color-mix(in oklch, var(--muted) 46%, var(--surface)), transparent 50%), var(--surface)",
 };
 
+function clampScore(score: number): number {
+  return Math.min(10, Math.max(1, Math.round(score)));
+}
+
 export function UserCard({
   name,
   initial,
@@ -30,12 +49,37 @@ export function UserCard({
   tags,
   avatarVariant = "default",
   status = "active",
+  personalityScore,
+  cityLabel,
+  countryLabel,
+  meetup,
+  primaryAcked = false,
+  onPrimaryAction,
   onViewProfile,
 }: UserCardProps) {
   const reducedMotion = useReducedMotion();
   const intentText = intents.join("  ·  ") || "";
+  const hosted = Boolean(meetup);
+  const score =
+    personalityScore !== undefined ? clampScore(personalityScore) : null;
+  const scorePct = score !== null ? ((score - 1) / 9) * 100 : 0;
+
   const viewProfileClassName =
-    "inline-flex min-h-11 shrink-0 items-center rounded-[11px] border border-border bg-transparent px-3 text-[11px] text-foreground transition-[border-color,background] duration-150 hover:border-foreground hover:bg-[color-mix(in_oklch,var(--fg)_6%,transparent)]";
+    "inline-flex min-h-11 flex-1 items-center justify-center rounded-[11px] border border-border bg-transparent px-3 text-[11px] text-foreground transition-[border-color,background] duration-150 hover:border-foreground hover:bg-[color-mix(in_oklch,var(--fg)_6%,transparent)]";
+
+  const primaryClassName = primaryAcked
+    ? "inline-flex min-h-11 flex-1 items-center justify-center rounded-[11px] border border-border bg-transparent px-3 text-[11px] font-semibold text-muted transition-[background,border-color,color] duration-150"
+    : "inline-flex min-h-11 flex-1 items-center justify-center rounded-[11px] border border-[color-mix(in_oklch,var(--accent)_60%,var(--border))] bg-[color-mix(in_oklch,var(--accent)_14%,transparent)] px-3 text-[11px] font-semibold text-accent transition-[background,border-color] duration-150 hover:bg-[color-mix(in_oklch,var(--accent)_22%,transparent)]";
+
+  const primaryLabel = hosted
+    ? primaryAcked
+      ? "Request sent"
+      : "Request to Join"
+    : primaryAcked
+      ? "Reach out sent"
+      : "Connect / Reach Out";
+
+  const locationLine = [cityLabel, countryLabel].filter(Boolean).join(" · ");
 
   return (
     <article className="relative overflow-hidden rounded-[22px] border border-border bg-[color-mix(in_oklch,var(--surface)_88%,transparent)] p-4 shadow-[0_18px_48px_color-mix(in_oklch,var(--bg)_76%,transparent)]">
@@ -59,12 +103,50 @@ export function UserCard({
             </span>
           </div>
           <p className="mt-[3px] text-[11px] text-muted">{subline}</p>
+          {locationLine ? (
+            <p className="mt-1 font-mono text-[10px] text-muted">{locationLine}</p>
+          ) : null}
         </div>
 
         <span className="flex items-center gap-[5px] whitespace-nowrap font-mono text-[9px] text-muted before:size-1.5 before:rounded-full before:bg-accent before:shadow-[0_0_12px_color-mix(in_oklch,var(--accent)_76%,transparent)] before:content-[''] max-[360px]:col-start-2">
           {status}
         </span>
       </div>
+
+      {score !== null ? (
+        <div className="mt-3.5 rounded-[14px] border border-border bg-[color-mix(in_oklch,var(--surface)_72%,transparent)] px-3 py-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <p className="font-mono text-[9px] uppercase tracking-[0.08em] text-muted">
+              Introvert ↔ Extrovert
+            </p>
+            <span className="font-mono text-[11px] font-bold text-accent">
+              {score}/10
+            </span>
+          </div>
+          <div className="mt-2 flex items-center gap-2">
+            <span className="shrink-0 font-mono text-[8px] text-muted">Quiet</span>
+            <div
+              className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-[color-mix(in_oklch,var(--fg)_10%,transparent)]"
+              role="meter"
+              aria-label="Personality score"
+              aria-valuemin={1}
+              aria-valuemax={10}
+              aria-valuenow={score}
+            >
+              <motion.div
+                className="absolute inset-y-0 left-0 rounded-full bg-accent shadow-[0_0_10px_color-mix(in_oklch,var(--accent)_60%,transparent)]"
+                initial={false}
+                animate={{ width: `${scorePct}%` }}
+                transition={{
+                  duration: reducedMotion ? 0 : 0.4,
+                  ease: [0.22, 1, 0.36, 1],
+                }}
+              />
+            </div>
+            <span className="shrink-0 font-mono text-[8px] text-muted">Social</span>
+          </div>
+        </div>
+      ) : null}
 
       <div className="mt-[15px] min-h-12 border-l-2 border-accent bg-[color-mix(in_oklch,var(--accent)_14%,transparent)] px-3 py-2.5">
         <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-accent">
@@ -78,30 +160,80 @@ export function UserCard({
           ) : (
             <motion.p
               className="whitespace-nowrap text-xs leading-[1.4] text-foreground"
-              animate={{ x: ["100%", "-100%"] }}
+              animate={{ x: ["0%", "-50%"] }}
               transition={{
                 repeat: Infinity,
                 ease: "linear",
-                duration: 15,
+                duration: Math.max(12, intentText.length * 0.35),
               }}
             >
+              {intentText}
+              <span className="px-8" aria-hidden>
+                ·
+              </span>
               {intentText}
             </motion.p>
           )}
         </div>
       </div>
 
-      <div className="mt-[15px] flex items-center justify-between gap-3">
-        <div className="flex min-w-0 flex-wrap gap-1.5">
-          {tags.map((tag) => (
-            <span
-              key={tag}
-              className="inline-flex items-center whitespace-nowrap rounded-full border border-border px-2 py-1 text-[10px] text-muted"
-            >
-              {tag}
-            </span>
-          ))}
+      {meetup ? (
+        <div className="mt-3.5 rounded-[14px] border border-[color-mix(in_oklch,var(--accent)_35%,var(--border))] bg-[color-mix(in_oklch,var(--accent)_8%,transparent)] px-3 py-3">
+          <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-accent">
+            Hosted meetup
+          </p>
+          {meetup.title ? (
+            <h4 className="mt-1 font-display text-[15px] leading-[1.2] text-foreground">
+              {meetup.title}
+            </h4>
+          ) : null}
+          {meetup.description ? (
+            <p className="mt-1.5 text-[11px] leading-[1.45] text-muted">
+              {meetup.description}
+            </p>
+          ) : null}
+          <div className="mt-2.5 grid gap-1.5">
+            <div className="flex items-center gap-2 text-[11px] text-foreground">
+              <MapPin
+                className="size-3.5 shrink-0 text-accent"
+                strokeWidth={1.7}
+                aria-hidden
+              />
+              {meetup.venue}
+            </div>
+            <div className="flex items-center gap-2 text-[11px] text-foreground">
+              <Calendar
+                className="size-3.5 shrink-0 text-accent"
+                strokeWidth={1.7}
+                aria-hidden
+              />
+              {meetup.when}
+            </div>
+          </div>
         </div>
+      ) : null}
+
+      <div className="mt-[15px] flex flex-wrap gap-1.5">
+        {tags.map((tag) => (
+          <span
+            key={tag}
+            className="inline-flex items-center whitespace-nowrap rounded-full border border-border px-2 py-1 text-[10px] text-muted"
+          >
+            {tag}
+          </span>
+        ))}
+      </div>
+
+      <div className="mt-3.5 flex gap-2">
+        {onPrimaryAction ? (
+          <button
+            type="button"
+            onClick={onPrimaryAction}
+            className={primaryClassName}
+          >
+            {primaryLabel}
+          </button>
+        ) : null}
         {onViewProfile ? (
           <button
             type="button"

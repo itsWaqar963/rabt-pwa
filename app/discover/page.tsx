@@ -10,6 +10,7 @@ import { ProfilePopup } from "@/components/ui/ProfilePopup";
 import { UserCard } from "@/components/ui/UserCard";
 import {
   DEFAULT_FILTERS,
+  getFilterLabel,
   getFilterMetaLabel,
   type DiscoveryFilters,
 } from "@/lib/discovery-filters";
@@ -22,9 +23,22 @@ import {
 export default function DiscoverPage() {
   const [filters, setFilters] = useState<DiscoveryFilters>(DEFAULT_FILTERS);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [ackedIds, setAckedIds] = useState<Set<string>>(new Set());
   const [filterBarStuck, setFilterBarStuck] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
   const filterSentinelRef = useRef<HTMLDivElement>(null);
+
+  function toggleAck(id: string) {
+    setAckedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
 
   useEffect(() => {
     const root = mainRef.current;
@@ -125,6 +139,12 @@ export default function DiscoverPage() {
                   tags={user.tags}
                   avatarVariant={user.avatarVariant}
                   status={user.status}
+                  personalityScore={user.personalityScore}
+                  cityLabel={getFilterLabel("city", user.city)}
+                  countryLabel={getFilterLabel("country", user.country)}
+                  meetup={user.meetup}
+                  primaryAcked={ackedIds.has(user.id)}
+                  onPrimaryAction={() => toggleAck(user.id)}
                   onViewProfile={() => setSelectedUserId(user.id)}
                 />
               ))
