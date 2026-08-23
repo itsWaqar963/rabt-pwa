@@ -31,9 +31,15 @@ const FILTER_ICONS: Record<FilterKey, LucideIcon> = {
 export type FilterPillsProps = {
   filters: DiscoveryFilters;
   onChange: (next: DiscoveryFilters) => void;
+  /** Subset of pills; defaults to all discovery keys */
+  keys?: FilterKey[];
 };
 
-export function FilterPills({ filters, onChange }: FilterPillsProps) {
+export function FilterPills({
+  filters,
+  onChange,
+  keys = FILTER_KEYS,
+}: FilterPillsProps) {
   const [activeKey, setActiveKey] = useState<FilterKey | null>(null);
   const [drawerKey, setDrawerKey] = useState<FilterKey>("country");
   const [shell, setShell] = useState<HTMLElement | null>(null);
@@ -80,7 +86,7 @@ export function FilterPills({ filters, onChange }: FilterPillsProps) {
         aria-label="Discovery filters"
         className="flex w-full items-center justify-evenly gap-1.5 overflow-x-auto px-[18px] py-2.5 [scrollbar-width:none] max-[360px]:justify-center max-[360px]:gap-1 max-[360px]:px-3.5 [&::-webkit-scrollbar]:hidden"
       >
-        {FILTER_KEYS.map((key) => {
+        {keys.map((key) => {
           const code = getFilterCode(key, filters[key]);
           const isOpen = activeKey === key;
           const Icon = FILTER_ICONS[key];

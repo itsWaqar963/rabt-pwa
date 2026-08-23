@@ -13,6 +13,9 @@ export type DiscoveryMeetup = {
   venue: string;
   when: string;
   description?: string;
+  /** Static seed display — never decremented on request */
+  spotsLeft: number;
+  category?: string;
 };
 
 export type DiscoveryUser = UserCardProps & {
@@ -37,6 +40,10 @@ export type HostedMeetup = {
   organizerName: string;
   organizerRole: string;
   hostUserId: string;
+  spotsLeft: number;
+  city: string;
+  country: string;
+  source: "seed" | "created";
 };
 
 export const DISCOVERY_USERS: DiscoveryUser[] = [
@@ -68,6 +75,8 @@ export const DISCOVERY_USERS: DiscoveryUser[] = [
       when: "Saturday · 7:30 PM",
       description:
         "A quiet reading circle for people making space for better questions and better work.",
+      spotsLeft: 6,
+      category: "study",
     },
   },
   {
@@ -98,6 +107,8 @@ export const DISCOVERY_USERS: DiscoveryUser[] = [
       when: "Sunday · 8:00 AM",
       description:
         "Walk, talk, and trade notes on the local problems worth building for.",
+      spotsLeft: 4,
+      category: "walk",
     },
   },
   {
@@ -149,6 +160,8 @@ export const DISCOVERY_USERS: DiscoveryUser[] = [
       when: "Saturday · 9:00 AM",
       description:
         "Low-pressure breakfast for payment-ops and fintech builders swapping notes.",
+      spotsLeft: 5,
+      category: "builders",
     },
   },
   {
@@ -200,6 +213,8 @@ export const DISCOVERY_USERS: DiscoveryUser[] = [
       when: "Friday · 6:00 PM",
       description:
         "Bring a WIP, critique kindly, leave with one next step.",
+      spotsLeft: 8,
+      category: "tech",
     },
   },
   {
@@ -251,6 +266,8 @@ export const DISCOVERY_USERS: DiscoveryUser[] = [
       when: "Sunday · 10:00 AM",
       description:
         "A thoughtful walk for builders who care how models land in the world.",
+      spotsLeft: 7,
+      category: "walk",
     },
   },
   {
@@ -302,6 +319,8 @@ export const DISCOVERY_USERS: DiscoveryUser[] = [
       when: "Thursday · 5:30 PM",
       description:
         "Distributed systems debate over coffee — bring a war story.",
+      spotsLeft: 6,
+      category: "coffee",
     },
   },
   {
@@ -360,12 +379,13 @@ export function getHostedMeetups(users: DiscoveryUser[]): HostedMeetup[] {
   return users.flatMap((user) => {
     if (!user.meetup) return [];
     const role = user.subline.split(" · ")[0]?.trim() || user.subline;
+    const category = user.meetup.category ?? "host";
     return [
       {
         id: user.meetup.id,
-        kind: "Physical gathering · host",
+        kind: `Physical gathering · ${category}`,
         title: user.meetup.title ?? `${user.name}'s meetup`,
-        status: "Open",
+        status: `${user.meetup.spotsLeft} spots left`,
         description:
           user.meetup.description ?? user.intents[0] ?? "Hosted meetup",
         location: user.meetup.venue,
@@ -373,6 +393,10 @@ export function getHostedMeetups(users: DiscoveryUser[]): HostedMeetup[] {
         organizerName: user.name,
         organizerRole: role,
         hostUserId: user.id,
+        spotsLeft: user.meetup.spotsLeft,
+        city: user.city,
+        country: user.country,
+        source: "seed",
       },
     ];
   });

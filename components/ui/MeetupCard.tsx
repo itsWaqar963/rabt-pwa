@@ -11,8 +11,11 @@ export type MeetupCardProps = {
   when: string;
   organizerName: string;
   organizerRole: string;
+  spotsLeft?: number;
   requested?: boolean;
   onRequestToggle?: () => void;
+  /** Hide request CTA for events you host */
+  hideRequest?: boolean;
 };
 
 export function MeetupCard({
@@ -24,9 +27,14 @@ export function MeetupCard({
   when,
   organizerName,
   organizerRole,
+  spotsLeft,
   requested = false,
   onRequestToggle,
+  hideRequest = false,
 }: MeetupCardProps) {
+  const statusLabel =
+    spotsLeft !== undefined ? `${spotsLeft} spots left` : status;
+
   return (
     <article
       className={`rounded-[18px] border border-border bg-[color-mix(in_oklch,var(--surface)_88%,transparent)] p-4 shadow-[0_18px_48px_color-mix(in_oklch,var(--bg)_76%,transparent)] transition-[border-color] duration-150 hover:border-[color-mix(in_oklch,var(--fg)_44%,var(--border))] ${
@@ -43,7 +51,7 @@ export function MeetupCard({
           </h3>
         </div>
         <span className="shrink-0 rounded-full border border-border px-[7px] py-[5px] font-mono text-[9px] text-muted">
-          {status}
+          {statusLabel}
         </span>
       </div>
 
@@ -64,17 +72,19 @@ export function MeetupCard({
         Hosted by <strong className="font-semibold text-foreground">{organizerName}</strong> · {organizerRole}
       </p>
 
-      <button
-        type="button"
-        onClick={onRequestToggle}
-        className={`mt-[15px] min-h-11 w-full rounded-[11px] border text-[11px] font-semibold transition-[background,border-color,color] duration-150 ${
-          requested
-            ? "border-border bg-transparent text-muted"
-            : "border-[color-mix(in_oklch,var(--accent)_60%,var(--border))] bg-[color-mix(in_oklch,var(--accent)_14%,transparent)] text-accent hover:bg-[color-mix(in_oklch,var(--accent)_22%,transparent)]"
-        }`}
-      >
-        {requested ? "Request sent" : "Request to Join"}
-      </button>
+      {hideRequest ? null : (
+        <button
+          type="button"
+          onClick={onRequestToggle}
+          className={`mt-[15px] min-h-11 w-full rounded-[11px] border text-[11px] font-semibold transition-[background,border-color,color] duration-150 ${
+            requested
+              ? "border-border bg-transparent text-muted"
+              : "border-[color-mix(in_oklch,var(--accent)_60%,var(--border))] bg-[color-mix(in_oklch,var(--accent)_14%,transparent)] text-accent hover:bg-[color-mix(in_oklch,var(--accent)_22%,transparent)]"
+          }`}
+        >
+          {requested ? "Request sent" : "Request to Join"}
+        </button>
+      )}
     </article>
   );
 }

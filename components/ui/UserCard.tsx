@@ -10,6 +10,8 @@ export type UserCardMeetup = {
   venue: string;
   when: string;
   description?: string;
+  spotsLeft?: number;
+  category?: string;
 };
 
 export type UserCardProps = {

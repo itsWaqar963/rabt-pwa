@@ -2,42 +2,100 @@
 
 import { useMemo, useState } from "react";
 import { BottomNav } from "@/components/layout/BottomNav";
+import { useMeetupStore } from "@/components/providers/MeetupStoreProvider";
+import { CreateMeetupModal } from "@/components/ui/CreateMeetupModal";
+import { FilterPills } from "@/components/ui/FilterPills";
 import { MeetupCard } from "@/components/ui/MeetupCard";
+import {
+  DEFAULT_FILTERS,
+  getFilterMetaLabel,
+  type DiscoveryFilters,
+} from "@/lib/discovery-filters";
 import {
   DISCOVERY_USERS,
   getHostedMeetups,
+  type HostedMeetup,
 } from "@/lib/discovery-users";
+import {
+  createdMeetupToHosted,
+  filterHostedMeetups,
+} from "@/lib/meetup-store";
 
 type Tab = "explore" | "events";
 
+const EXPLORE_FILTER_KEYS = ["country", "city"] as const;
+
+function renderMeetupCard(
+  meetup: HostedMeetup,
+  opts: {
+    requested: boolean;
+    onRequestToggle?: () => void;
+    hideRequest?: boolean;
+  },
+) {
+  return (
+    <MeetupCard
+      key={meetup.id}
+      kind={meetup.kind}
+      title={meetup.title}
+      status={meetup.status}
+      description={meetup.description}
+      location={meetup.location}
+      when={meetup.when}
+      organizerName={meetup.organizerName}
+      organizerRole={meetup.organizerRole}
+      spotsLeft={meetup.spotsLeft}
+      requested={opts.requested}
+      onRequestToggle={opts.onRequestToggle}
+      hideRequest={opts.hideRequest}
+    />
+  );
+}
+
 export default function MeetupsPage() {
   const [activeTab, setActiveTab] = useState<Tab>("explore");
-  const [requestedIds, setRequestedIds] = useState<Set<string>>(new Set());
-  const [broadcastAck, setBroadcastAck] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [filters, setFilters] = useState<DiscoveryFilters>(DEFAULT_FILTERS);
 
-  const hostedMeetups = useMemo(
+  const {
+    createdMeetups,
+    meetupIds,
+    isMeetupRequested,
+    toggleMeetupRequest,
+    addCreatedMeetup,
+  } = useMeetupStore();
+
+  const seedMeetups = useMemo(
     () => getHostedMeetups(DISCOVERY_USERS),
     [],
   );
 
-  function toggleRequest(id: string) {
-    setRequestedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  }
+  const createdAsHosted = useMemo(
+    () => createdMeetups.map(createdMeetupToHosted),
+    [createdMeetups],
+  );
 
-  function handleBroadcast() {
-    setBroadcastAck(true);
-    window.setTimeout(() => setBroadcastAck(false), 2200);
-  }
+  const allExplore = useMemo(
+    () => [...createdAsHosted, ...seedMeetups],
+    [createdAsHosted, seedMeetups],
+  );
 
+  const exploreMeetups = useMemo(
+    () => filterHostedMeetups(allExplore, filters.country, filters.city),
+    [allExplore, filters.country, filters.city],
+  );
+
+  const joinedMeetups = useMemo(
+    () => allExplore.filter((m) => meetupIds.has(m.id)),
+    [allExplore, meetupIds],
+  );
+
+  const metaLabel = getFilterMetaLabel(filters);
   const isExplore = activeTab === "explore";
+
+  function openCreate() {
+    setCreateOpen(true);
+  }
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_80%_4%,color-mix(in_oklch,var(--muted)_9%,transparent),transparent_20rem),var(--bg)]">
@@ -60,11 +118,11 @@ export default function MeetupsPage() {
           </div>
           <button
             type="button"
-            onClick={handleBroadcast}
+            onClick={openCreate}
             className="inline-flex min-h-11 items-center gap-[7px] rounded-[11px] border border-[color-mix(in_oklch,var(--accent)_60%,var(--border))] bg-[color-mix(in_oklch,var(--accent)_14%,transparent)] px-3 text-[11px] font-semibold text-accent transition-[background,border-color] duration-150 hover:bg-[color-mix(in_oklch,var(--accent)_22%,transparent)] max-[360px]:px-2.5"
           >
             <span className="text-lg font-normal leading-none">+</span>
-            {broadcastAck ? "Meetup broadcast" : "Create Meetup"}
+            Create Meetup
           </button>
         </header>
 
@@ -82,10 +140,10 @@ export default function MeetupsPage() {
 
           <button
             type="button"
-            onClick={handleBroadcast}
+            onClick={openCreate}
             className="mt-5 min-h-12 w-full rounded-[11px] border border-[color-mix(in_oklch,var(--accent)_65%,var(--border))] bg-accent font-bold text-[oklch(0.18_0.03_165)] transition-[filter] duration-150 hover:brightness-110"
           >
-            {broadcastAck ? "Intent broadcast" : "Broadcast your intent"}
+            Broadcast your intent
           </button>
         </section>
 
@@ -123,45 +181,109 @@ export default function MeetupsPage() {
         </section>
 
         <section aria-live="polite">
-          <div className="flex items-end justify-between gap-3 px-0.5 pb-[13px] pt-6">
-            <h2 className="font-display text-[21px] text-foreground">
-              {isExplore ? "Near you" : "Your calendar"}
-            </h2>
-            <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted">
-              {isExplore
-                ? `${hostedMeetups.length} meetups · hosts`
-                : "No saved meetups"}
-            </span>
-          </div>
-
           {isExplore ? (
-            <div className="grid gap-3 pb-2">
-              {hostedMeetups.map((meetup) => (
-                <MeetupCard
-                  key={meetup.id}
-                  kind={meetup.kind}
-                  title={meetup.title}
-                  status={meetup.status}
-                  description={meetup.description}
-                  location={meetup.location}
-                  when={meetup.when}
-                  organizerName={meetup.organizerName}
-                  organizerRole={meetup.organizerRole}
-                  requested={requestedIds.has(meetup.id)}
-                  onRequestToggle={() => toggleRequest(meetup.id)}
+            <>
+              <div className="-mx-[18px] mt-4 border-y border-[color-mix(in_oklch,var(--accent)_35%,var(--border))] max-[360px]:-mx-3.5">
+                <FilterPills
+                  filters={filters}
+                  onChange={setFilters}
+                  keys={[...EXPLORE_FILTER_KEYS]}
                 />
-              ))}
-            </div>
+              </div>
+
+              <div className="flex items-end justify-between gap-3 px-0.5 pb-[13px] pt-6">
+                <h2 className="font-display text-[21px] text-foreground">
+                  Near you
+                </h2>
+                <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted">
+                  {exploreMeetups.length} meetups · {metaLabel}
+                </span>
+              </div>
+
+              {exploreMeetups.length === 0 ? (
+                <div className="border border-dashed border-border px-5 py-8 text-center text-xs text-muted">
+                  No meetups match these filters. Try another city or broadcast
+                  one.
+                </div>
+              ) : (
+                <div className="grid gap-3 pb-2">
+                  {exploreMeetups.map((meetup) =>
+                    renderMeetupCard(meetup, {
+                      requested: isMeetupRequested(meetup.id),
+                      onRequestToggle: () => toggleMeetupRequest(meetup.id),
+                      hideRequest: meetup.source === "created",
+                    }),
+                  )}
+                </div>
+              )}
+            </>
           ) : (
-            <div className="border border-dashed border-border px-5 py-8 pb-2 text-center text-xs text-muted">
-              You have no upcoming meetups yet. Explore a gathering or broadcast
-              one for your city.
-            </div>
+            <>
+              <div className="flex items-end justify-between gap-3 px-0.5 pb-[13px] pt-6">
+                <h2 className="font-display text-[21px] text-foreground">
+                  Your calendar
+                </h2>
+                <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted">
+                  {createdAsHosted.length + joinedMeetups.length} saved
+                </span>
+              </div>
+
+              <div className="grid gap-6 pb-2">
+                <section>
+                  <h3 className="mb-3 px-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-muted">
+                    Hosted
+                  </h3>
+                  {createdAsHosted.length === 0 ? (
+                    <div className="border border-dashed border-border px-5 py-6 text-center text-xs text-muted">
+                      You have not hosted a meetup yet. Create one to see it
+                      here.
+                    </div>
+                  ) : (
+                    <div className="grid gap-3">
+                      {createdAsHosted.map((meetup) =>
+                        renderMeetupCard(meetup, {
+                          requested: false,
+                          hideRequest: true,
+                        }),
+                      )}
+                    </div>
+                  )}
+                </section>
+
+                <section>
+                  <h3 className="mb-3 px-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-muted">
+                    Joined / Requested
+                  </h3>
+                  {joinedMeetups.length === 0 ? (
+                    <div className="border border-dashed border-border px-5 py-6 text-center text-xs text-muted">
+                      No join requests yet. Explore a gathering and request a
+                      spot.
+                    </div>
+                  ) : (
+                    <div className="grid gap-3">
+                      {joinedMeetups.map((meetup) =>
+                        renderMeetupCard(meetup, {
+                          requested: true,
+                          onRequestToggle: () =>
+                            toggleMeetupRequest(meetup.id),
+                        }),
+                      )}
+                    </div>
+                  )}
+                </section>
+              </div>
+            </>
           )}
         </section>
       </main>
 
       <BottomNav />
+
+      <CreateMeetupModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onSubmit={addCreatedMeetup}
+      />
     </div>
   );
 }

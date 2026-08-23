@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BottomNav } from "@/components/layout/BottomNav";
+import { useMeetupStore } from "@/components/providers/MeetupStoreProvider";
 import { BackToTopFab } from "@/components/ui/BackToTopFab";
 import { EmptyClusters } from "@/components/ui/EmptyClusters";
 import { FilterPills } from "@/components/ui/FilterPills";
@@ -23,21 +24,22 @@ import {
 export default function DiscoverPage() {
   const [filters, setFilters] = useState<DiscoveryFilters>(DEFAULT_FILTERS);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  const [ackedIds, setAckedIds] = useState<Set<string>>(new Set());
   const [filterBarStuck, setFilterBarStuck] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
   const filterSentinelRef = useRef<HTMLDivElement>(null);
+  const {
+    isMeetupRequested,
+    isConnectAcked,
+    toggleMeetupRequest,
+    toggleConnect,
+  } = useMeetupStore();
 
-  function toggleAck(id: string) {
-    setAckedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
+  function handlePrimaryAction(userId: string, meetupId?: string) {
+    if (meetupId) {
+      toggleMeetupRequest(meetupId);
+      return;
+    }
+    toggleConnect(userId);
   }
 
   useEffect(() => {
@@ -143,8 +145,14 @@ export default function DiscoverPage() {
                   cityLabel={getFilterLabel("city", user.city)}
                   countryLabel={getFilterLabel("country", user.country)}
                   meetup={user.meetup}
-                  primaryAcked={ackedIds.has(user.id)}
-                  onPrimaryAction={() => toggleAck(user.id)}
+                  primaryAcked={
+                    user.meetup
+                      ? isMeetupRequested(user.meetup.id)
+                      : isConnectAcked(user.id)
+                  }
+                  onPrimaryAction={() =>
+                    handlePrimaryAction(user.id, user.meetup?.id)
+                  }
                   onViewProfile={() => setSelectedUserId(user.id)}
                 />
               ))
