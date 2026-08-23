@@ -11,6 +11,12 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { X } from "lucide-react";
 import {
+  DarkSelectPopover,
+  meetupFieldClass,
+} from "@/components/ui/DarkSelectPopover";
+import { DatePopover } from "@/components/ui/DatePopover";
+import { TimePopover } from "@/components/ui/TimePopover";
+import {
   FILTER_OPTIONS,
   getCityOptions,
   getFilterLabel,
@@ -37,6 +43,8 @@ type FormState = {
   city: string;
   country: string;
 };
+
+type PopoverId = "category" | "date" | "time" | "country" | "city" | null;
 
 const INITIAL_FORM: FormState = {
   title: "",
@@ -80,6 +88,7 @@ export function CreateMeetupModal({
   const [shell, setShell] = useState<HTMLElement | null>(null);
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
   const [errors, setErrors] = useState<FieldErrors>({});
+  const [openPopover, setOpenPopover] = useState<PopoverId>(null);
 
   useEffect(() => {
     setShell(
@@ -91,6 +100,7 @@ export function CreateMeetupModal({
     if (!open) return;
     setForm(INITIAL_FORM);
     setErrors({});
+    setOpenPopover(null);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
@@ -101,11 +111,16 @@ export function CreateMeetupModal({
   useEffect(() => {
     if (!open) return;
     function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
+      if (event.key !== "Escape") return;
+      if (openPopover) {
+        setOpenPopover(null);
+        return;
+      }
+      onClose();
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  }, [open, onClose, openPopover]);
 
   const cityOptions = getCityOptions(form.country).filter(
     (opt) => opt.value !== "all",
@@ -113,6 +128,10 @@ export function CreateMeetupModal({
   const countryOptions = FILTER_OPTIONS.country.filter(
     (opt) => opt.value !== "all",
   );
+  const categoryOptions = MEETUP_CATEGORIES.map((category) => ({
+    value: category,
+    label: category,
+  }));
 
   function setField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => {
@@ -122,7 +141,7 @@ export function CreateMeetupModal({
           (opt) => opt.value !== "all",
         );
         if (!cities.some((c) => c.value === next.city)) {
-          next.city = cities[0]?.value ?? "lahore";
+          next.city = cities[0]?.value ?? "";
         }
       }
       return next;
@@ -137,6 +156,7 @@ export function CreateMeetupModal({
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    setOpenPopover(null);
     const nextErrors = validate(form);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
@@ -178,7 +198,7 @@ export function CreateMeetupModal({
             aria-modal="true"
             aria-labelledby={titleId}
             onSubmit={handleSubmit}
-            className="relative z-[1] max-h-[calc(100dvh-32px)] w-full max-w-[424px] overflow-y-auto rounded-[24px] border border-[color-mix(in_oklch,var(--accent)_48%,var(--border))] bg-[linear-gradient(165deg,color-mix(in_oklch,var(--accent)_10%,var(--surface)),var(--surface)_45%,var(--bg))] p-[22px] shadow-[0_0_0_1px_color-mix(in_oklch,var(--accent)_18%,transparent),0_28px_80px_color-mix(in_oklch,var(--bg)_80%,transparent)] [scrollbar-width:thin]"
+            className="relative z-[1] max-h-[calc(100dvh-32px)] w-full max-w-[424px] overflow-y-auto overflow-x-visible rounded-[24px] border border-[color-mix(in_oklch,var(--accent)_48%,var(--border))] bg-[linear-gradient(165deg,color-mix(in_oklch,var(--accent)_10%,var(--surface)),var(--surface)_45%,var(--bg))] p-[22px] shadow-[0_0_0_1px_color-mix(in_oklch,var(--accent)_18%,transparent),0_28px_80px_color-mix(in_oklch,var(--bg)_80%,transparent)] [scrollbar-width:thin]"
             initial={
               reducedMotion ? false : { opacity: 0, y: 24, scale: 0.98 }
             }
@@ -226,7 +246,7 @@ export function CreateMeetupModal({
                 value={form.title}
                 onChange={(e) => setField("title", e.target.value)}
                 placeholder="e.g. Quiet reading circle"
-                className={fieldControlClass}
+                className={meetupFieldClass}
               />
             </Field>
 
@@ -235,20 +255,17 @@ export function CreateMeetupModal({
               error={errors.category}
               htmlFor="meetup-category"
             >
-              <select
+              <DarkSelectPopover
                 id="meetup-category"
+                label="Category"
                 value={form.category}
-                onChange={(e) =>
-                  setField("category", e.target.value as MeetupCategory)
+                options={categoryOptions}
+                open={openPopover === "category"}
+                onOpenChange={(next) =>
+                  setOpenPopover(next ? "category" : null)
                 }
-                className={fieldControlClass}
-              >
-                {MEETUP_CATEGORIES.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) => setField("category", v as MeetupCategory)}
+              />
             </Field>
 
             <Field
@@ -261,27 +278,33 @@ export function CreateMeetupModal({
                 value={form.venue}
                 onChange={(e) => setField("venue", e.target.value)}
                 placeholder="e.g. Model Town Park"
-                className={fieldControlClass}
+                className={meetupFieldClass}
               />
             </Field>
 
             <div className="grid grid-cols-2 gap-3">
               <Field label="Date" error={errors.date} htmlFor="meetup-date">
-                <input
+                <DatePopover
                   id="meetup-date"
-                  type="date"
+                  label="Date"
                   value={form.date}
-                  onChange={(e) => setField("date", e.target.value)}
-                  className={fieldControlClass}
+                  open={openPopover === "date"}
+                  onOpenChange={(next) =>
+                    setOpenPopover(next ? "date" : null)
+                  }
+                  onChange={(v) => setField("date", v)}
                 />
               </Field>
               <Field label="Time" error={errors.time} htmlFor="meetup-time">
-                <input
+                <TimePopover
                   id="meetup-time"
-                  type="time"
+                  label="Time"
                   value={form.time}
-                  onChange={(e) => setField("time", e.target.value)}
-                  className={fieldControlClass}
+                  open={openPopover === "time"}
+                  onOpenChange={(next) =>
+                    setOpenPopover(next ? "time" : null)
+                  }
+                  onChange={(v) => setField("time", v)}
                 />
               </Field>
             </div>
@@ -298,7 +321,7 @@ export function CreateMeetupModal({
                 max={99}
                 value={form.maxSpots}
                 onChange={(e) => setField("maxSpots", e.target.value)}
-                className={fieldControlClass}
+                className={meetupFieldClass}
               />
             </Field>
 
@@ -308,38 +331,42 @@ export function CreateMeetupModal({
                 error={errors.country}
                 htmlFor="meetup-country"
               >
-                <select
+                <DarkSelectPopover
                   id="meetup-country"
+                  label="Country"
                   value={form.country}
-                  onChange={(e) => setField("country", e.target.value)}
-                  className={fieldControlClass}
-                >
-                  {countryOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
+                  options={countryOptions.map((opt) => ({
+                    value: opt.value,
+                    label: opt.label,
+                  }))}
+                  open={openPopover === "country"}
+                  onOpenChange={(next) =>
+                    setOpenPopover(next ? "country" : null)
+                  }
+                  onChange={(v) => setField("country", v)}
+                />
               </Field>
               <Field label="City" error={errors.city} htmlFor="meetup-city">
-                <select
+                <DarkSelectPopover
                   id="meetup-city"
+                  label="City"
                   value={form.city}
-                  onChange={(e) => setField("city", e.target.value)}
-                  className={fieldControlClass}
-                >
-                  {cityOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {getFilterLabel("city", opt.value)}
-                    </option>
-                  ))}
-                </select>
+                  options={cityOptions.map((opt) => ({
+                    value: opt.value,
+                    label: getFilterLabel("city", opt.value),
+                  }))}
+                  open={openPopover === "city"}
+                  onOpenChange={(next) =>
+                    setOpenPopover(next ? "city" : null)
+                  }
+                  onChange={(v) => setField("city", v)}
+                />
               </Field>
             </div>
 
             <button
               type="submit"
-              className="mt-4 min-h-12 w-full rounded-[11px] border border-[color-mix(in_oklch,var(--accent)_65%,var(--border))] bg-accent font-bold text-[oklch(0.18_0.03_165)] transition-[filter] duration-150 hover:brightness-110"
+              className="mt-4 min-h-12 w-full rounded-[11px] border border-[color-mix(in_oklch,var(--accent)_65%,var(--border))] bg-accent px-3 font-bold text-[oklch(0.18_0.03_165)] transition-[filter,box-shadow] duration-150 hover:brightness-110 hover:shadow-[0_0_22px_color-mix(in_oklch,var(--accent)_35%,transparent)]"
             >
               Broadcast Meetup
             </button>
@@ -350,9 +377,6 @@ export function CreateMeetupModal({
     shell,
   );
 }
-
-const fieldControlClass =
-  "w-full min-h-[46px] rounded-[10px] border border-border bg-[color-mix(in_oklch,var(--bg)_42%,var(--surface))] px-3 text-sm text-foreground outline-none transition-[border-color] duration-150 placeholder:text-[color-mix(in_oklch,var(--muted)_72%,transparent)] focus:border-[color-mix(in_oklch,var(--accent)_55%,var(--border))]";
 
 function Field({
   label,
