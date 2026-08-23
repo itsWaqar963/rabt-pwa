@@ -32,6 +32,9 @@ export default function DiscoverPage() {
     isConnectAcked,
     toggleMeetupRequest,
     toggleConnect,
+    hideUser,
+    isUserHidden,
+    isMeetupHidden,
   } = useMeetupStore();
 
   function handlePrimaryAction(userId: string, meetupId?: string) {
@@ -59,8 +62,13 @@ export default function DiscoverPage() {
   }, []);
 
   const feed = useMemo(
-    () => filterDiscoveryUsers(DISCOVERY_USERS, filters),
-    [filters],
+    () =>
+      filterDiscoveryUsers(DISCOVERY_USERS, filters).filter((user) => {
+        if (isUserHidden(user.id)) return false;
+        if (user.meetup && isMeetupHidden(user.meetup.id)) return false;
+        return true;
+      }),
+    [filters, isUserHidden, isMeetupHidden],
   );
   const metaLabel = getFilterMetaLabel(filters);
   const selectedUser = findDiscoveryUser(DISCOVERY_USERS, selectedUserId);
@@ -154,6 +162,10 @@ export default function DiscoverPage() {
                     handlePrimaryAction(user.id, user.meetup?.id)
                   }
                   onViewProfile={() => setSelectedUserId(user.id)}
+                  onHide={() => {
+                    hideUser(user.id);
+                    if (selectedUserId === user.id) setSelectedUserId(null);
+                  }}
                 />
               ))
             )}
@@ -168,6 +180,14 @@ export default function DiscoverPage() {
         user={selectedUser}
         open={selectedUserId !== null && selectedUser !== null}
         onClose={() => setSelectedUserId(null)}
+        onHide={
+          selectedUser
+            ? () => {
+                hideUser(selectedUser.id);
+                setSelectedUserId(null);
+              }
+            : undefined
+        }
       />
     </div>
   );

@@ -29,6 +29,7 @@ export type UserCardProps = {
   primaryAcked?: boolean;
   onPrimaryAction?: () => void;
   onViewProfile?: () => void;
+  onHide?: () => void;
 };
 
 const AVATAR_BG: Record<NonNullable<UserCardProps["avatarVariant"]>, string> = {
@@ -58,6 +59,7 @@ export function UserCard({
   primaryAcked = false,
   onPrimaryAction,
   onViewProfile,
+  onHide,
 }: UserCardProps) {
   const reducedMotion = useReducedMotion();
   const intentText = intents.join("  ·  ") || "";
@@ -250,6 +252,16 @@ export function UserCard({
           </Link>
         )}
       </div>
+
+      {onHide ? (
+        <button
+          type="button"
+          onClick={onHide}
+          className="mt-2 w-full py-1 text-center font-mono text-[9px] uppercase tracking-[0.08em] text-muted transition-colors hover:text-foreground"
+        >
+          Report / Hide
+        </button>
+      ) : null}
     </article>
   );
 }

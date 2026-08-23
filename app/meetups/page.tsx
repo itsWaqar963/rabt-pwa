@@ -19,6 +19,8 @@ import {
 import {
   createdMeetupToHosted,
   filterHostedMeetups,
+  type JoinRequestStatus,
+  type MeetupRequester,
 } from "@/lib/meetup-store";
 
 type Tab = "explore" | "events";
@@ -31,6 +33,15 @@ function renderMeetupCard(
     requested: boolean;
     onRequestToggle?: () => void;
     hideRequest?: boolean;
+    venueLocked?: boolean;
+    showChatToggle?: boolean;
+    joinStatus?: JoinRequestStatus;
+    onHide?: () => void;
+    requesters?: MeetupRequester[];
+    onRespondRequester?: (
+      requesterId: string,
+      status: "accepted" | "declined",
+    ) => void;
   },
 ) {
   return (
@@ -48,6 +59,12 @@ function renderMeetupCard(
       requested={opts.requested}
       onRequestToggle={opts.onRequestToggle}
       hideRequest={opts.hideRequest}
+      venueLocked={opts.venueLocked}
+      showChatToggle={opts.showChatToggle}
+      joinStatus={opts.joinStatus}
+      onHide={opts.onHide}
+      requesters={opts.requesters}
+      onRespondRequester={opts.onRespondRequester}
     />
   );
 }
@@ -61,8 +78,13 @@ export default function MeetupsPage() {
     createdMeetups,
     meetupIds,
     isMeetupRequested,
+    getJoinStatus,
     toggleMeetupRequest,
     addCreatedMeetup,
+    getRequesters,
+    respondToRequester,
+    hideMeetup,
+    isMeetupHidden,
   } = useMeetupStore();
 
   const seedMeetups = useMemo(
@@ -71,13 +93,17 @@ export default function MeetupsPage() {
   );
 
   const createdAsHosted = useMemo(
-    () => createdMeetups.map(createdMeetupToHosted),
-    [createdMeetups],
+    () =>
+      createdMeetups
+        .map(createdMeetupToHosted)
+        .filter((m) => !isMeetupHidden(m.id)),
+    [createdMeetups, isMeetupHidden],
   );
 
   const allExplore = useMemo(
-    () => [...createdAsHosted, ...seedMeetups],
-    [createdAsHosted, seedMeetups],
+    () =>
+      [...createdAsHosted, ...seedMeetups].filter((m) => !isMeetupHidden(m.id)),
+    [createdAsHosted, seedMeetups, isMeetupHidden],
   );
 
   const exploreMeetups = useMemo(
@@ -205,6 +231,7 @@ export default function MeetupsPage() {
                       requested: isMeetupRequested(meetup.id),
                       onRequestToggle: () => toggleMeetupRequest(meetup.id),
                       hideRequest: meetup.source === "created",
+                      onHide: () => hideMeetup(meetup.id),
                     }),
                   )}
                 </div>
@@ -237,6 +264,10 @@ export default function MeetupsPage() {
                         renderMeetupCard(meetup, {
                           requested: false,
                           hideRequest: true,
+                          requesters: getRequesters(meetup.id),
+                          onRespondRequester: (requesterId, status) =>
+                            respondToRequester(meetup.id, requesterId, status),
+                          onHide: () => hideMeetup(meetup.id),
                         }),
                       )}
                     </div>
@@ -254,13 +285,19 @@ export default function MeetupsPage() {
                     </div>
                   ) : (
                     <div className="grid gap-3">
-                      {joinedMeetups.map((meetup) =>
-                        renderMeetupCard(meetup, {
+                      {joinedMeetups.map((meetup) => {
+                        const status = getJoinStatus(meetup.id);
+                        const accepted = status === "accepted";
+                        return renderMeetupCard(meetup, {
                           requested: true,
                           onRequestToggle: () =>
                             toggleMeetupRequest(meetup.id),
-                        }),
-                      )}
+                          venueLocked: !accepted,
+                          showChatToggle: accepted,
+                          joinStatus: status,
+                          onHide: () => hideMeetup(meetup.id),
+                        });
+                      })}
                     </div>
                   )}
                 </section>

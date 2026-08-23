@@ -22,6 +22,10 @@ import {
   getFilterLabel,
 } from "@/lib/discovery-filters";
 import {
+  getContentWarningMessage,
+  textsContainRestrictedContent,
+} from "@/lib/content-guard";
+import {
   MEETUP_CATEGORIES,
   type CreateMeetupInput,
   type MeetupCategory,
@@ -88,6 +92,7 @@ export function CreateMeetupModal({
   const [shell, setShell] = useState<HTMLElement | null>(null);
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
   const [errors, setErrors] = useState<FieldErrors>({});
+  const [contentWarning, setContentWarning] = useState<string | null>(null);
   const [openPopover, setOpenPopover] = useState<PopoverId>(null);
 
   useEffect(() => {
@@ -100,6 +105,7 @@ export function CreateMeetupModal({
     if (!open) return;
     setForm(INITIAL_FORM);
     setErrors({});
+    setContentWarning(null);
     setOpenPopover(null);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -152,6 +158,7 @@ export function CreateMeetupModal({
       delete next[key];
       return next;
     });
+    setContentWarning(null);
   }
 
   function handleSubmit(event: FormEvent) {
@@ -160,6 +167,12 @@ export function CreateMeetupModal({
     const nextErrors = validate(form);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
+
+    if (textsContainRestrictedContent(form.title, form.venue)) {
+      setContentWarning(getContentWarningMessage());
+      return;
+    }
+    setContentWarning(null);
 
     onSubmit({
       title: form.title,
@@ -363,6 +376,15 @@ export function CreateMeetupModal({
                 />
               </Field>
             </div>
+
+            {contentWarning ? (
+              <p
+                role="alert"
+                className="mt-3 rounded-[11px] border border-[color-mix(in_oklch,oklch(0.75_0.13_25)_45%,var(--border))] bg-[color-mix(in_oklch,oklch(0.75_0.13_25)_12%,transparent)] px-3 py-2.5 text-[11px] leading-[1.45] text-[oklch(0.82_0.1_25)]"
+              >
+                {contentWarning}
+              </p>
+            ) : null}
 
             <button
               type="submit"

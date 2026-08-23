@@ -1,6 +1,9 @@
 "use client";
 
-import { Calendar, MapPin } from "lucide-react";
+import { useState } from "react";
+import { Calendar, MapPin, MessageCircle } from "lucide-react";
+import type { JoinRequestStatus, MeetupRequester } from "@/lib/meetup-store";
+import { joinStatusLabel } from "@/lib/meetup-store";
 
 export type MeetupCardProps = {
   kind: string;
@@ -16,6 +19,17 @@ export type MeetupCardProps = {
   onRequestToggle?: () => void;
   /** Hide request CTA for events you host */
   hideRequest?: boolean;
+  /** Blur/hide exact venue until host accepts */
+  venueLocked?: boolean;
+  /** Show secure meetup chat placeholder toggle (accepted only) */
+  showChatToggle?: boolean;
+  joinStatus?: JoinRequestStatus;
+  onHide?: () => void;
+  requesters?: MeetupRequester[];
+  onRespondRequester?: (
+    requesterId: string,
+    status: "accepted" | "declined",
+  ) => void;
 };
 
 export function MeetupCard({
@@ -31,9 +45,21 @@ export function MeetupCard({
   requested = false,
   onRequestToggle,
   hideRequest = false,
+  venueLocked = false,
+  showChatToggle = false,
+  joinStatus,
+  onHide,
+  requesters,
+  onRespondRequester,
 }: MeetupCardProps) {
+  const [chatOpen, setChatOpen] = useState(false);
   const statusLabel =
     spotsLeft !== undefined ? `${spotsLeft} spots left` : status;
+
+  const pendingRequesters =
+    requesters?.filter((r) => r.status === "pending") ?? [];
+  const decidedRequesters =
+    requesters?.filter((r) => r.status !== "pending") ?? [];
 
   return (
     <article
@@ -50,9 +76,16 @@ export function MeetupCard({
             {title}
           </h3>
         </div>
-        <span className="shrink-0 rounded-full border border-border px-[7px] py-[5px] font-mono text-[9px] text-muted">
-          {statusLabel}
-        </span>
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          <span className="rounded-full border border-border px-[7px] py-[5px] font-mono text-[9px] text-muted">
+            {statusLabel}
+          </span>
+          {joinStatus ? (
+            <span className="rounded-full border border-[color-mix(in_oklch,var(--accent)_40%,var(--border))] px-[7px] py-[3px] font-mono text-[8px] uppercase tracking-[0.06em] text-accent">
+              {joinStatusLabel(joinStatus)}
+            </span>
+          ) : null}
+        </div>
       </div>
 
       <p className="mt-[11px] text-xs leading-[1.55] text-muted">{description}</p>
@@ -60,7 +93,17 @@ export function MeetupCard({
       <div className="mt-[15px] grid gap-2 border-t border-[color-mix(in_oklch,var(--border)_72%,transparent)] pt-3.5">
         <div className="flex items-center gap-2 text-[11px] text-foreground">
           <MapPin className="size-4 shrink-0 text-accent" strokeWidth={1.7} aria-hidden />
-          {location}
+          {venueLocked ? (
+            <span
+              className="select-none blur-[5px] opacity-70"
+              aria-label="Venue hidden until approved"
+              title="Venue unlocks after the host accepts"
+            >
+              Exact venue pending approval
+            </span>
+          ) : (
+            location
+          )}
         </div>
         <div className="flex items-center gap-2 text-[11px] text-foreground">
           <Calendar className="size-4 shrink-0 text-accent" strokeWidth={1.7} aria-hidden />
@@ -71,6 +114,89 @@ export function MeetupCard({
       <p className="mt-3 text-[10px] text-muted">
         Hosted by <strong className="font-semibold text-foreground">{organizerName}</strong> · {organizerRole}
       </p>
+
+      {showChatToggle ? (
+        <div className="mt-3">
+          <button
+            type="button"
+            onClick={() => setChatOpen((v) => !v)}
+            className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-[11px] border border-[color-mix(in_oklch,var(--accent)_45%,var(--border))] bg-[color-mix(in_oklch,var(--accent)_10%,transparent)] px-3 text-[11px] font-semibold text-accent transition-[background] duration-150 hover:bg-[color-mix(in_oklch,var(--accent)_18%,transparent)]"
+          >
+            <MessageCircle className="size-3.5" strokeWidth={1.8} aria-hidden />
+            {chatOpen ? "Close meetup chat" : "Open meetup chat"}
+          </button>
+          {chatOpen ? (
+            <div className="mt-2 rounded-[12px] border border-dashed border-border bg-[color-mix(in_oklch,var(--surface)_60%,transparent)] px-3 py-4 text-center">
+              <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted">
+                Secure meetup chat
+              </p>
+              <p className="mt-1.5 text-[11px] leading-[1.45] text-muted">
+                Chat placeholder — messaging comes later. Venue is unlocked for
+                accepted guests.
+              </p>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {requesters && requesters.length > 0 ? (
+        <div className="mt-3.5 rounded-[12px] border border-border bg-[color-mix(in_oklch,var(--surface)_70%,transparent)] px-3 py-3">
+          <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted">
+            Join requests
+          </p>
+          {pendingRequesters.length === 0 && decidedRequesters.length === 0 ? (
+            <p className="mt-2 text-[11px] text-muted">No requesters yet.</p>
+          ) : null}
+          <ul className="mt-2 grid gap-2">
+            {pendingRequesters.map((requester) => (
+              <li
+                key={requester.id}
+                className="flex flex-wrap items-center justify-between gap-2"
+              >
+                <div>
+                  <p className="text-[12px] font-semibold text-foreground">
+                    {requester.name}
+                  </p>
+                  <p className="font-mono text-[8px] uppercase tracking-[0.06em] text-accent">
+                    IMS student · pending
+                  </p>
+                </div>
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onRespondRequester?.(requester.id, "accepted")
+                    }
+                    className="min-h-9 rounded-[9px] border border-[color-mix(in_oklch,var(--accent)_55%,var(--border))] bg-[color-mix(in_oklch,var(--accent)_14%,transparent)] px-2.5 text-[10px] font-semibold text-accent"
+                  >
+                    Accept
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onRespondRequester?.(requester.id, "declined")
+                    }
+                    className="min-h-9 rounded-[9px] border border-border bg-transparent px-2.5 text-[10px] font-semibold text-muted"
+                  >
+                    Decline
+                  </button>
+                </div>
+              </li>
+            ))}
+            {decidedRequesters.map((requester) => (
+              <li
+                key={requester.id}
+                className="flex items-center justify-between gap-2 text-[11px]"
+              >
+                <span className="text-foreground">{requester.name}</span>
+                <span className="font-mono text-[8px] uppercase tracking-[0.06em] text-muted">
+                  {joinStatusLabel(requester.status)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       {hideRequest ? null : (
         <button
@@ -85,6 +211,16 @@ export function MeetupCard({
           {requested ? "Request sent" : "Request to Join"}
         </button>
       )}
+
+      {onHide ? (
+        <button
+          type="button"
+          onClick={onHide}
+          className="mt-2 w-full py-1 text-center font-mono text-[9px] uppercase tracking-[0.08em] text-muted transition-colors hover:text-foreground"
+        >
+          Report / Hide
+        </button>
+      ) : null}
     </article>
   );
 }

@@ -11,6 +11,7 @@ export type ProfilePopupProps = {
   user: DiscoveryUser | null;
   open: boolean;
   onClose: () => void;
+  onHide?: () => void;
 };
 
 const AVATAR_BG: Record<
@@ -28,7 +29,7 @@ function clampScore(score: number): number {
   return Math.min(10, Math.max(1, Math.round(score)));
 }
 
-export function ProfilePopup({ user, open, onClose }: ProfilePopupProps) {
+export function ProfilePopup({ user, open, onClose, onHide }: ProfilePopupProps) {
   const reducedMotion = useReducedMotion();
   const [shell, setShell] = useState<HTMLElement | null>(null);
 
@@ -294,6 +295,16 @@ export function ProfilePopup({ user, open, onClose }: ProfilePopupProps) {
                         ))}
                       </div>
                     </div>
+                  ) : null}
+
+                  {onHide ? (
+                    <button
+                      type="button"
+                      onClick={onHide}
+                      className="mt-5 w-full py-2 text-center font-mono text-[9px] uppercase tracking-[0.08em] text-muted transition-colors hover:text-foreground"
+                    >
+                      Report / Hide
+                    </button>
                   ) : null}
                 </div>
               </div>
