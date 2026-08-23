@@ -137,14 +137,6 @@ export default function MeetupsPage() {
             Small gatherings for useful conversations, shared practice, and a
             reason to show up.
           </p>
-
-          <button
-            type="button"
-            onClick={openCreate}
-            className="mt-5 min-h-12 w-full rounded-[11px] border border-[color-mix(in_oklch,var(--accent)_65%,var(--border))] bg-accent font-bold text-[oklch(0.18_0.03_165)] transition-[filter] duration-150 hover:brightness-110"
-          >
-            Broadcast your intent
-          </button>
         </section>
 
         <section
@@ -188,6 +180,7 @@ export default function MeetupsPage() {
                   filters={filters}
                   onChange={setFilters}
                   keys={[...EXPLORE_FILTER_KEYS]}
+                  pillDividers
                 />
               </div>
 
