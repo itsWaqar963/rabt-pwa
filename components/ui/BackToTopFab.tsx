@@ -51,7 +51,7 @@ export function BackToTopFab({ scrollRef }: BackToTopFabProps) {
               ? { duration: 0 }
               : { type: "spring", stiffness: 420, damping: 28 }
           }
-          className="absolute bottom-[calc(max(14px,env(safe-area-inset-bottom))+5.5rem)] right-[18px] z-[45] grid size-11 place-items-center rounded-full border border-[color-mix(in_oklch,var(--accent)_35%,var(--border))] bg-[color-mix(in_oklch,var(--surface)_88%,transparent)] text-foreground shadow-[0_12px_32px_color-mix(in_oklch,var(--bg)_70%,transparent)] backdrop-blur-md transition-[border-color,background] duration-150 hover:border-accent hover:bg-[color-mix(in_oklch,var(--accent)_12%,var(--surface))] active:scale-95 max-[360px]:right-3.5"
+          className="absolute bottom-[calc(max(14px,env(safe-area-inset-bottom))+7rem)] right-5 z-50 grid size-11 place-items-center rounded-full border border-[color-mix(in_oklch,var(--accent)_35%,var(--border))] bg-[color-mix(in_oklch,var(--surface)_88%,transparent)] text-foreground shadow-[0_12px_32px_color-mix(in_oklch,var(--bg)_70%,transparent)] backdrop-blur-md transition-[border-color,background] duration-150 hover:border-accent hover:bg-[color-mix(in_oklch,var(--accent)_12%,var(--surface))] active:scale-95 max-[360px]:right-3.5"
         >
           <ChevronUp className="size-5" strokeWidth={1.8} aria-hidden />
         </motion.button>
