@@ -20,6 +20,8 @@ export type UserCardProps = {
   subline: string;
   intents: string[];
   tags: string[];
+  /** Google / profile photo URL */
+  avatarUrl?: string;
   avatarVariant?: "default" | "blue" | "quiet";
   status?: string;
   personalityScore?: number;
@@ -50,6 +52,7 @@ export function UserCard({
   subline,
   intents,
   tags,
+  avatarUrl,
   avatarVariant = "default",
   status = "active",
   personalityScore,
@@ -67,6 +70,7 @@ export function UserCard({
   const score =
     personalityScore !== undefined ? clampScore(personalityScore) : null;
   const scorePct = score !== null ? ((score - 1) / 9) * 100 : 0;
+  const photoUrl = avatarUrl?.trim() || undefined;
 
   const viewProfileClassName =
     "inline-flex min-h-11 flex-1 items-center justify-center rounded-[11px] border border-border bg-transparent px-3 text-[11px] text-foreground transition-[border-color,background] duration-150 hover:border-foreground hover:bg-[color-mix(in_oklch,var(--fg)_6%,transparent)]";
@@ -93,8 +97,19 @@ export function UserCard({
           style={{ background: AVATAR_BG[avatarVariant] }}
           aria-hidden
         >
-          <span className="pointer-events-none absolute inset-x-3 top-2 h-[13px] rounded-full bg-[color-mix(in_oklch,var(--fg)_72%,transparent)] opacity-55" />
-          <span className="relative z-[1] mt-[11px]">{initial}</span>
+          {photoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- remote profile avatar
+            <img
+              src={photoUrl}
+              alt=""
+              className="absolute inset-0 size-full object-cover"
+            />
+          ) : (
+            <>
+              <span className="pointer-events-none absolute inset-x-3 top-2 h-[13px] rounded-full bg-[color-mix(in_oklch,var(--fg)_72%,transparent)] opacity-55" />
+              <span className="relative z-[1] mt-[11px]">{initial}</span>
+            </>
+          )}
         </div>
 
         <div className="min-w-0">

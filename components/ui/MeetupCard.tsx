@@ -15,6 +15,8 @@ export type MeetupCardProps = {
   when: string;
   organizerName: string;
   organizerRole: string;
+  /** Google / profile photo for host */
+  hostAvatarUrl?: string;
   spotsLeft?: number;
   requested?: boolean;
   onRequestToggle?: () => void;
@@ -41,12 +43,43 @@ function RequesterAvatar({
   avatarUrl?: string;
 }) {
   const initials = initialsFromName(name);
+  const src = avatarUrl?.trim() || undefined;
   return (
     <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-full border border-[color-mix(in_oklch,var(--accent)_35%,var(--border))] bg-[color-mix(in_oklch,var(--accent)_14%,transparent)]">
-      {avatarUrl ? (
+      {src ? (
         // eslint-disable-next-line @next/next/no-img-element -- remote profile avatar
         <img
-          src={avatarUrl}
+          src={src}
+          alt=""
+          className="size-full object-cover rounded-full"
+        />
+      ) : (
+        <span
+          aria-hidden
+          className="font-display text-[11px] font-semibold leading-none text-accent"
+        >
+          {initials}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function HostAvatar({
+  name,
+  avatarUrl,
+}: {
+  name: string;
+  avatarUrl?: string;
+}) {
+  const initials = initialsFromName(name);
+  const src = avatarUrl?.trim() || undefined;
+  return (
+    <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-full border border-[color-mix(in_oklch,var(--accent)_35%,var(--border))] bg-[color-mix(in_oklch,var(--accent)_14%,transparent)]">
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element -- remote host avatar
+        <img
+          src={src}
           alt=""
           className="size-full object-cover rounded-full"
         />
@@ -71,6 +104,7 @@ export function MeetupCard({
   when,
   organizerName,
   organizerRole,
+  hostAvatarUrl,
   spotsLeft,
   requested = false,
   onRequestToggle,
@@ -141,9 +175,16 @@ export function MeetupCard({
         </div>
       </div>
 
-      <p className="mt-3 text-[10px] text-muted">
-        Hosted by <strong className="font-semibold text-foreground">{organizerName}</strong> · {organizerRole}
-      </p>
+      <div className="mt-3 flex items-center gap-2.5">
+        <HostAvatar name={organizerName} avatarUrl={hostAvatarUrl} />
+        <p className="min-w-0 text-[10px] text-muted">
+          Hosted by{" "}
+          <strong className="font-semibold text-foreground">
+            {organizerName}
+          </strong>{" "}
+          · {organizerRole}
+        </p>
+      </div>
 
       {showChatToggle ? (
         <div className="mt-3">

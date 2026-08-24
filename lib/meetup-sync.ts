@@ -122,6 +122,14 @@ function initialFromName(name: string): string {
   return trimmed.charAt(0);
 }
 
+/** Empty string from PostgREST counts as missing. */
+function nonEmptyAvatar(
+  url: string | null | undefined,
+): string | undefined {
+  const trimmed = url?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
 export function mapMeetupRowToHosted(
   row: MeetupRow,
   profile?: HostProfileRow | null,
@@ -155,7 +163,7 @@ export function mapMeetupRowToHosted(
     source: "remote",
     hostGender: mapGenderToDiscovery(host?.gender),
     hostAgeGroup: mapAgeToDiscovery(host?.age_group),
-    hostAvatarUrl: host?.avatar_url ?? undefined,
+    hostAvatarUrl: nonEmptyAvatar(host?.avatar_url),
     hostSubline: host?.subline ?? undefined,
     hostIntent: host?.active_intent ?? undefined,
     hostSkills: host?.skills ?? undefined,
@@ -219,22 +227,32 @@ export async function fetchMeetupsWithHosts(): Promise<HostedMeetup[]> {
   try {
     let { data, error } = await supabase
       .from("meetups")
-      .select(`*, profiles:host_id(${HOST_PROFILE_COLS})`)
+      .select(`*, profiles!meetups_host_id_fkey(${HOST_PROFILE_COLS})`)
       .or("status.eq.open,status.is.null")
       .order("created_at", { ascending: false });
 
     if (error) {
-      // Fallback when status column missing or embed name fails
-      const retry = await supabase
+      // Fallback: alias embed, then plain rows + two-query profiles
+      const aliasRetry = await supabase
         .from("meetups")
-        .select("*")
+        .select(`*, profiles:host_id(${HOST_PROFILE_COLS})`)
+        .or("status.eq.open,status.is.null")
         .order("created_at", { ascending: false });
-      if (retry.error) {
-        logRemoteError("fetchMeetupsWithHosts", retry.error);
-        return [];
+      if (!aliasRetry.error) {
+        data = aliasRetry.data;
+        error = null;
+      } else {
+        const retry = await supabase
+          .from("meetups")
+          .select("*")
+          .order("created_at", { ascending: false });
+        if (retry.error) {
+          logRemoteError("fetchMeetupsWithHosts", retry.error);
+          return [];
+        }
+        data = retry.data;
+        error = null;
       }
-      data = retry.data;
-      error = null;
     }
 
     const rows = (data ?? []) as MeetupRow[];
@@ -242,17 +260,34 @@ export async function fetchMeetupsWithHosts(): Promise<HostedMeetup[]> {
       (row) => !row.status || row.status === "open",
     );
 
-    const needsProfiles = openRows.some((row) => !asProfile(row.profiles));
-    const profileMap = needsProfiles
-      ? await fetchProfilesByIds(openRows.map((r) => r.host_id))
-      : new Map<string, HostProfileRow>();
+    const missingEmbed = openRows.filter((row) => !asProfile(row.profiles));
+    const profileMap =
+      missingEmbed.length > 0
+        ? await fetchProfilesByIds(missingEmbed.map((r) => r.host_id))
+        : new Map<string, HostProfileRow>();
 
-    return openRows.map((row) =>
+    let mapped = openRows.map((row) =>
       mapMeetupRowToHosted(
         row,
         asProfile(row.profiles) ?? profileMap.get(row.host_id) ?? null,
       ),
     );
+
+    // Fill stale embeds that have host but no avatar_url
+    const gapHostIds = mapped
+      .filter((m) => !nonEmptyAvatar(m.hostAvatarUrl))
+      .map((m) => m.hostUserId)
+      .filter(Boolean);
+    if (gapHostIds.length > 0) {
+      const gapMap = await fetchProfilesByIds(gapHostIds);
+      mapped = mapped.map((m) => {
+        if (nonEmptyAvatar(m.hostAvatarUrl)) return m;
+        const filled = nonEmptyAvatar(gapMap.get(m.hostUserId)?.avatar_url);
+        return filled ? { ...m, hostAvatarUrl: filled } : m;
+      });
+    }
+
+    return mapped;
   } catch (err) {
     logRemoteError("fetchMeetupsWithHosts", err);
     return [];
@@ -487,42 +522,73 @@ export async function fetchHostJoinRequests(
     const withEmbed = await supabase
       .from("join_requests")
       .select(
-        `id, meetup_id, requester_id, status, profiles:requester_id(${HOST_PROFILE_COLS})`,
+        `id, meetup_id, requester_id, status, profiles!join_requests_requester_id_fkey(${HOST_PROFILE_COLS})`,
       )
       .in("meetup_id", meetupIds);
 
     if (withEmbed.error) {
-      const retry = await supabase
+      const aliasRetry = await supabase
         .from("join_requests")
-        .select("id, meetup_id, requester_id, status")
+        .select(
+          `id, meetup_id, requester_id, status, profiles:requester_id(${HOST_PROFILE_COLS})`,
+        )
         .in("meetup_id", meetupIds);
-      if (retry.error) {
-        logRemoteError("fetchHostJoinRequests", retry.error);
-        return {};
+      if (!aliasRetry.error) {
+        rows = (aliasRetry.data ?? []) as JoinRequestRow[];
+      } else {
+        const retry = await supabase
+          .from("join_requests")
+          .select("id, meetup_id, requester_id, status")
+          .in("meetup_id", meetupIds);
+        if (retry.error) {
+          logRemoteError("fetchHostJoinRequests", retry.error);
+          return {};
+        }
+        rows = (retry.data ?? []) as JoinRequestRow[];
       }
-      rows = (retry.data ?? []) as JoinRequestRow[];
     } else {
       rows = (withEmbed.data ?? []) as JoinRequestRow[];
     }
 
-    const needsProfiles = rows.some((row) => !asProfile(row.profiles));
-    const profileMap = needsProfiles
-      ? await fetchProfilesByIds(rows.map((r) => r.requester_id))
-      : new Map<string, HostProfileRow>();
+    const missingEmbed = rows.filter((row) => !asProfile(row.profiles));
+    const profileMap =
+      missingEmbed.length > 0
+        ? await fetchProfilesByIds(missingEmbed.map((r) => r.requester_id))
+        : new Map<string, HostProfileRow>();
+
+    // Also fill requesters whose embed profile lacks a usable avatar
+    const gapIds = rows
+      .map((row) => {
+        const p =
+          asProfile(row.profiles) ?? profileMap.get(row.requester_id) ?? null;
+        return p && !nonEmptyAvatar(p.avatar_url) ? row.requester_id : null;
+      })
+      .filter((id): id is string => Boolean(id));
+    if (gapIds.length > 0) {
+      const gapMap = await fetchProfilesByIds(gapIds);
+      for (const [id, profile] of gapMap) {
+        profileMap.set(id, profile);
+      }
+    }
 
     const out: Record<string, MeetupRequester[]> = {};
     for (const row of rows) {
       if (!isJoinStatus(row.status)) continue;
       const profile =
         asProfile(row.profiles) ?? profileMap.get(row.requester_id) ?? null;
-      const name = profile?.full_name?.trim() || "Requester";
+      // Prefer gap-filled profile when embed had empty avatar
+      const resolved =
+        profile && !nonEmptyAvatar(profile.avatar_url)
+          ? (profileMap.get(row.requester_id) ?? profile)
+          : profile;
+      const name = resolved?.full_name?.trim() || "Requester";
       const list = out[row.meetup_id] ?? [];
       list.push({
         id: row.requester_id,
         name,
         status: row.status,
         requestId: row.id,
-        avatarUrl: profile?.avatar_url ?? undefined,
+        avatarUrl: nonEmptyAvatar(resolved?.avatar_url),
       });
       out[row.meetup_id] = list;
     }

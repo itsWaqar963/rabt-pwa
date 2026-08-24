@@ -439,6 +439,7 @@ export function hostedMeetupToDiscoveryUser(
     id: meetup.id,
     name,
     initial: meetup.hostInitial || name.charAt(0) || "?",
+    avatarUrl: meetup.hostAvatarUrl,
     subline: meetup.hostSubline || meetup.organizerRole || "Host",
     intents: [intent, meetup.title],
     tags,

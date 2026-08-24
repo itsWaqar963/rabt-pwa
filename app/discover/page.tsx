@@ -169,6 +169,7 @@ export default function DiscoverPage() {
                   key={user.id}
                   name={user.name}
                   initial={user.initial}
+                  avatarUrl={user.avatarUrl}
                   subline={user.subline}
                   intents={user.intents}
                   tags={user.tags}

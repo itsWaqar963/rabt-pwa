@@ -60,6 +60,7 @@ function renderMeetupCard(
       when={meetup.when}
       organizerName={meetup.organizerName}
       organizerRole={meetup.organizerRole}
+      hostAvatarUrl={meetup.hostAvatarUrl}
       spotsLeft={meetup.spotsLeft}
       requested={opts.requested}
       onRequestToggle={opts.onRequestToggle}

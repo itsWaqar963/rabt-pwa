@@ -410,6 +410,7 @@ export function MeetupStoreProvider({ children }: { children: ReactNode }) {
               organizerName: user?.name ?? "You",
               organizerRole: "Host",
               hostUserId: userId,
+              hostAvatarUrl: user?.avatarUrl,
               spotsLeft: remote.maxSpots,
               city: remote.city,
               country: remote.country,

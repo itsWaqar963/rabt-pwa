@@ -150,8 +150,11 @@ export async function saveProfileRemote(
       country: profile.country,
       updated_at: new Date().toISOString(),
     };
-    if (identity?.email !== undefined) payload.email = identity.email ?? null;
-    if (identity?.avatarUrl !== undefined) {
+    if (identity) {
+      if (identity.email !== undefined) {
+        payload.email = identity.email ?? null;
+      }
+      // Always write avatar when identity is passed (undefined → null)
       payload.avatar_url = identity.avatarUrl ?? null;
     }
 

@@ -69,6 +69,7 @@ export function ProfilePopup({ user, open, onClose, onHide }: ProfilePopupProps)
   const intentText = user?.intents.join("  ·  ") || "";
   const avatarVariant = user?.avatarVariant ?? "default";
   const status = user?.status ?? "active";
+  const photoUrl = user?.avatarUrl?.trim() || undefined;
 
   const cluster = user
     ? [
@@ -156,8 +157,21 @@ export function ProfilePopup({ user, open, onClose, onHide }: ProfilePopupProps)
                       style={{ background: AVATAR_BG[avatarVariant] }}
                       aria-hidden
                     >
-                      <span className="pointer-events-none absolute inset-x-4 top-3 h-[15px] rounded-full bg-[color-mix(in_oklch,var(--fg)_72%,transparent)] opacity-55" />
-                      <span className="relative z-[1] mt-3">{user.initial}</span>
+                      {photoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- remote profile avatar
+                        <img
+                          src={photoUrl}
+                          alt=""
+                          className="absolute inset-0 size-full object-cover"
+                        />
+                      ) : (
+                        <>
+                          <span className="pointer-events-none absolute inset-x-4 top-3 h-[15px] rounded-full bg-[color-mix(in_oklch,var(--fg)_72%,transparent)] opacity-55" />
+                          <span className="relative z-[1] mt-3">
+                            {user.initial}
+                          </span>
+                        </>
+                      )}
                     </div>
 
                     <h2
