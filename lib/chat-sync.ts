@@ -316,45 +316,18 @@ export async function fetchMessages(meetupId: string): Promise<ChatMessage[]> {
   if (!isSupabaseConfigured) return [];
 
   try {
-    let rows: MessageRow[] | null = null;
-
-    const embedded = await supabase
+    const { data, error } = await supabase
       .from("messages")
-      .select(
-        `id, meetup_id, sender_id, body, created_at, profiles!messages_sender_id_fkey(${PROFILE_EMBED_COLS})`,
-      )
+      .select("id, meetup_id, sender_id, body, created_at")
       .eq("meetup_id", meetupId)
       .order("created_at", { ascending: true });
 
-    if (!embedded.error) {
-      rows = (embedded.data ?? []) as MessageRow[];
-    } else {
-      const aliasRetry = await supabase
-        .from("messages")
-        .select(
-          `id, meetup_id, sender_id, body, created_at, profiles:sender_id(${PROFILE_EMBED_COLS})`,
-        )
-        .eq("meetup_id", meetupId)
-        .order("created_at", { ascending: true });
-
-      if (!aliasRetry.error) {
-        rows = (aliasRetry.data ?? []) as MessageRow[];
-      } else {
-        const plain = await supabase
-          .from("messages")
-          .select("id, meetup_id, sender_id, body, created_at")
-          .eq("meetup_id", meetupId)
-          .order("created_at", { ascending: true });
-
-        if (plain.error) {
-          logRemoteError("fetchMessages", plain.error);
-          return [];
-        }
-        rows = (plain.data ?? []) as MessageRow[];
-      }
+    if (error) {
+      logRemoteError("fetchMessages", error);
+      return [];
     }
 
-    return enrichRows(rows ?? []);
+    return enrichRows((data ?? []) as MessageRow[]);
   } catch (err) {
     logRemoteError("fetchMessages", err);
     return [];

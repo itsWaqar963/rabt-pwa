@@ -7,6 +7,8 @@
 -- → URL: https://<NEXT_PUBLIC_APP_URL>/api/hooks/message-inserted
 -- → HTTP Header: Authorization: Bearer <PUSH_WEBHOOK_SECRET>
 -- (or header x-rabt-webhook-secret: <PUSH_WEBHOOK_SECRET>)
+-- IMPORTANT: use Dashboard Webhooks only — NEVER add a row-level pg_net /
+-- net.http_post trigger on messages (blocks INSERT with 0A000). See 008 migration.
 
 create table if not exists public.messages (
   id uuid primary key default gen_random_uuid(),
