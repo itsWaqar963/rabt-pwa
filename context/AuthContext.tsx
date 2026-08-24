@@ -7,8 +7,9 @@ import React, {
   useEffect,
   useState,
 } from "react";
-import type { Session, User } from "@supabase/supabase-js";
+import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import { upsertProfileFromAuth } from "@/lib/profile-sync";
 
 export type AuthUser = {
   id: string;
@@ -59,6 +60,24 @@ function applySession(
   setUser(mapUser(session?.user));
 }
 
+function shouldRefreshUser(event: AuthChangeEvent): boolean {
+  switch (event) {
+    case "SIGNED_IN":
+    case "USER_UPDATED":
+      return true;
+    case "INITIAL_SESSION":
+    case "SIGNED_OUT":
+    case "TOKEN_REFRESHED":
+    case "PASSWORD_RECOVERY":
+    case "MFA_CHALLENGE_VERIFIED":
+      return false;
+    default: {
+      const _never: never = event;
+      return _never;
+    }
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -67,17 +86,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false;
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    async function refreshFromGetUser() {
+      const { data, error } = await supabase.auth.getUser();
+      if (cancelled) return;
+      if (error) {
+        console.error("[auth] getUser", error);
+        return;
+      }
+      const mapped = mapUser(data.user);
+      if (!mapped) return;
+      setUser(mapped);
+      setIsAuthenticated(true);
+      void upsertProfileFromAuth(mapped);
+    }
+
+    void supabase.auth.getSession().then(({ data: { session } }) => {
       if (cancelled) return;
       applySession(session, setUser, setIsAuthenticated);
       setLoading(false);
+      if (session) void refreshFromGetUser();
     });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       applySession(session, setUser, setIsAuthenticated);
       setLoading(false);
+      if (!shouldRefreshUser(event)) return;
+      // Defer so auth callback does not deadlock on getUser / upsert.
+      setTimeout(() => {
+        if (!cancelled) void refreshFromGetUser();
+      }, 0);
     });
 
     return () => {

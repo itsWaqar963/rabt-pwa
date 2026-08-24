@@ -21,21 +21,48 @@ export type ProfileData = {
 };
 
 export const DEFAULT_PROFILE: ProfileData = {
-  name: "Sana Khalid",
-  initial: "س",
-  subline: "Builder",
-  isImsStudent: true,
-  activeIntent:
-    "Looking for a weekend physical meetup in Lahore|Building a focused study circle for product designers|Open to a quiet coffee and systems conversation",
-  skills: ["Video Editing", "Next.js", "UI/UX", "Graphic Design"],
-  socialUrls: {
-    ...EMPTY_SOCIAL_URLS,
-    github: "https://github.com",
-    linkedin: "https://linkedin.com",
-    website: "https://example.com",
-  },
-  introvertExtrovert: 7,
+  name: "",
+  initial: "?",
+  subline: "",
+  isImsStudent: false,
+  activeIntent: "",
+  skills: [],
+  socialUrls: { ...EMPTY_SOCIAL_URLS },
+  introvertExtrovert: 5,
 };
+
+const DUMMY_PROFILE_NAME = "Sana Khalid";
+const LATIN_LETTER = /[A-Za-z]/;
+
+/** First letters of up to 2 Latin words; otherwise first character (Arabic / other). */
+export function initialsFromName(fullName: string): string {
+  const trimmed = fullName.trim();
+  if (!trimmed) return "?";
+
+  const words = trimmed.split(/\s+/).filter(Boolean);
+  const latinInitials: string[] = [];
+  for (const word of words) {
+    const match = word.match(LATIN_LETTER);
+    if (!match) continue;
+    latinInitials.push(match[0].toUpperCase());
+    if (latinInitials.length >= 2) break;
+  }
+  if (latinInitials.length > 0) return latinInitials.join("");
+
+  return Array.from(trimmed)[0] ?? "?";
+}
+
+export function overlayAuthIdentity(
+  profile: ProfileData,
+  user: { name: string; email?: string; avatarUrl?: string } | null,
+): ProfileData {
+  if (!user) return profile;
+  return {
+    ...profile,
+    name: user.name,
+    initial: initialsFromName(user.name),
+  };
+}
 
 function clampScore(score: number): number {
   return Math.min(10, Math.max(1, Math.round(score)));
@@ -61,11 +88,14 @@ function parseProfile(raw: string | null): ProfileData {
     const parsed: unknown = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object") return { ...DEFAULT_PROFILE };
     const row = parsed as Record<string, unknown>;
+    const rawName =
+      typeof row.name === "string" ? row.name : DEFAULT_PROFILE.name;
+    const isDummy = rawName === DUMMY_PROFILE_NAME;
     return {
-      name:
-        typeof row.name === "string" ? row.name : DEFAULT_PROFILE.name,
-      initial:
-        typeof row.initial === "string"
+      name: isDummy ? DEFAULT_PROFILE.name : rawName,
+      initial: isDummy
+        ? DEFAULT_PROFILE.initial
+        : typeof row.initial === "string"
           ? row.initial
           : DEFAULT_PROFILE.initial,
       subline:

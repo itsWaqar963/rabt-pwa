@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { AuthGuard } from "@/components/auth/AuthGuard";
+import { useAuth } from "@/context/AuthContext";
 import { Pencil, Settings } from "lucide-react";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { DigitalTrailRow } from "@/components/ui/DigitalTrailIcons";
@@ -11,11 +12,18 @@ import { ProfileSettingsModal } from "@/components/ui/ProfileSettingsModal";
 import {
   DEFAULT_PROFILE,
   formatIntentMarquee,
+  initialsFromName,
   loadProfile,
+  overlayAuthIdentity,
   parseActiveIntents,
   saveProfile,
   type ProfileData,
 } from "@/lib/profile-store";
+import {
+  fetchProfileRow,
+  mergeRemoteEditable,
+  saveProfileRemote,
+} from "@/lib/profile-sync";
 import { getConfiguredSocialLinks } from "@/lib/social-links";
 
 const XP_TOTAL = 860;
@@ -29,6 +37,7 @@ const CLUSTER = [
 
 export default function ProfilePage() {
   const reducedMotion = useReducedMotion();
+  const { user } = useAuth();
   const [profile, setProfile] = useState<ProfileData>(DEFAULT_PROFILE);
   const [hydrated, setHydrated] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -36,14 +45,45 @@ export default function ProfilePage() {
   const [toastVisible, setToastVisible] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const displayName = user?.name || profile.name;
+  const displayInitial = initialsFromName(displayName);
+  const avatarUrl = user?.avatarUrl;
   const intentText = formatIntentMarquee(profile.activeIntent);
   const intentFallback = parseActiveIntents(profile.activeIntent)[0] ?? "";
   const digitalTrail = getConfiguredSocialLinks(profile.socialUrls);
 
   useEffect(() => {
-    setProfile(loadProfile());
-    setHydrated(true);
-  }, []);
+    let cancelled = false;
+
+    async function hydrate() {
+      let next = overlayAuthIdentity(loadProfile(), user);
+      setProfile(next);
+      setHydrated(true);
+      if (!user) return;
+
+      try {
+        const row = await fetchProfileRow(user.id);
+        if (cancelled) return;
+        if (row) {
+          next = overlayAuthIdentity(mergeRemoteEditable(next, row), user);
+        } else {
+          void saveProfileRemote(user.id, next, user);
+        }
+        setProfile(next);
+        saveProfile(next);
+      } catch {
+        if (!cancelled) {
+          setProfile(next);
+          saveProfile(next);
+        }
+      }
+    }
+
+    void hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   useEffect(() => {
     return () => {
@@ -52,8 +92,10 @@ export default function ProfilePage() {
   }, []);
 
   function persist(next: ProfileData) {
-    setProfile(next);
-    saveProfile(next);
+    const withIdentity = overlayAuthIdentity(next, user);
+    setProfile(withIdentity);
+    saveProfile(withIdentity);
+    if (user) void saveProfileRemote(user.id, withIdentity, user);
   }
 
   function handleScoreChange(value: number) {
@@ -140,19 +182,28 @@ export default function ProfilePage() {
 
           <div className="grid grid-cols-[66px_1fr_auto] items-center gap-3 max-[360px]:grid-cols-[58px_1fr_auto]">
             <div
-              className="grid size-[66px] place-items-center rounded-[20px] border border-[color-mix(in_oklch,var(--accent)_52%,var(--border))] font-display text-[28px] text-foreground max-[360px]:size-[58px]"
+              className="relative grid size-[66px] place-items-center overflow-hidden rounded-[20px] border border-[color-mix(in_oklch,var(--accent)_52%,var(--border))] font-display text-[28px] text-foreground max-[360px]:size-[58px]"
               style={{
                 background:
                   "radial-gradient(circle at 72% 22%, color-mix(in oklch, var(--accent) 58%, var(--surface)), transparent 30%), radial-gradient(circle at 30% 75%, color-mix(in oklch, var(--muted) 34%, var(--surface)), transparent 50%), var(--surface)",
               }}
               aria-hidden
             >
-              {profile.initial}
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt=""
+                  className="absolute inset-0 size-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                displayInitial
+              )}
             </div>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-[7px]">
                 <h2 className="font-body text-lg font-bold text-foreground">
-                  {profile.name}
+                  {displayName}
                 </h2>
                 {profile.isImsStudent ? (
                   <span className="inline-flex items-center gap-1 rounded-full border border-[color-mix(in_oklch,var(--accent)_55%,var(--border))] bg-[color-mix(in_oklch,var(--accent)_12%,transparent)] px-1.5 py-[3px] font-mono text-[8px] uppercase tracking-[0.04em] text-accent shadow-[0_0_14px_color-mix(in_oklch,var(--accent)_35%,transparent)] before:text-[9px] before:content-['✓']">
