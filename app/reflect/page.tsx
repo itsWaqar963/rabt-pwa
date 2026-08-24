@@ -61,20 +61,25 @@ export default function ReflectPage() {
         </section>
 
         <section className="rounded-[18px] border border-[color-mix(in_oklch,var(--accent)_46%,var(--border))] bg-[linear-gradient(140deg,color-mix(in_oklch,var(--accent)_10%,var(--surface)),var(--surface))] p-4 shadow-[0_18px_46px_color-mix(in_oklch,var(--bg)_72%,transparent)]">
-          <div className="flex items-start justify-between gap-3">
-            <div>
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0 flex-1">
               <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
                 Your standing
               </p>
-              <h2 className="mt-[3px] font-display text-[21px] text-foreground">
+              <h2 className="mt-[3px] font-display text-[21px] leading-[1.15] text-foreground">
                 Trust, earned in person.
               </h2>
             </div>
-            <div className="grid min-h-[58px] min-w-[58px] place-items-center rounded-full border border-[color-mix(in_oklch,var(--accent)_58%,var(--border))] text-center font-mono text-[13px] font-bold leading-[1.1] text-accent">
-              4.9
-              <small className="mt-0 block text-[8px] font-normal text-muted">
-                / 5 rating
-              </small>
+            <div
+              className="flex size-[62px] shrink-0 flex-col items-center justify-center rounded-full border border-[color-mix(in_oklch,var(--accent)_62%,var(--border))] bg-[color-mix(in_oklch,var(--accent)_10%,var(--surface))] text-center shadow-[0_0_0_1px_color-mix(in_oklch,var(--accent)_20%,transparent),0_0_22px_color-mix(in_oklch,var(--accent)_28%,transparent)]"
+              aria-label="Trust rating 4.9 out of 5"
+            >
+              <span className="font-mono text-[15px] font-bold leading-none text-accent">
+                4.9
+              </span>
+              <span className="mt-1 font-mono text-[7px] uppercase leading-none tracking-[0.06em] text-muted">
+                / 5
+              </span>
             </div>
           </div>
           <div className="mt-[17px] grid grid-cols-3 gap-2 border-t border-[color-mix(in_oklch,var(--border)_78%,transparent)] pt-3.5">

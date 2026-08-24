@@ -2,14 +2,20 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
+import { Pencil, Settings } from "lucide-react";
 import { BottomNav } from "@/components/layout/BottomNav";
+import { EditProfileModal } from "@/components/ui/EditProfileModal";
+import { ProfileSettingsModal } from "@/components/ui/ProfileSettingsModal";
+import {
+  DEFAULT_PROFILE,
+  formatIntentMarquee,
+  loadProfile,
+  parseActiveIntents,
+  saveProfile,
+  type ProfileData,
+} from "@/lib/profile-store";
 
 const XP_TOTAL = 860;
-const INTENTS = [
-  "Looking for a weekend physical meetup in Lahore",
-  "Building a focused study circle for product designers",
-  "Open to a quiet coffee and systems conversation",
-] as const;
 
 const CLUSTER = [
   { label: "City", value: "Lahore" },
@@ -18,24 +24,46 @@ const CLUSTER = [
   { label: "Age group", value: "23–27" },
 ] as const;
 
-const LINKS = [
-  { label: "GitHub ↗", href: "https://github.com" },
-  { label: "LinkedIn ↗", href: "https://linkedin.com" },
-  { label: "Portfolio ↗", href: "https://example.com" },
-] as const;
+function socialLinks(profile: ProfileData) {
+  return [
+    { label: "GitHub ↗", href: profile.socialUrls.github },
+    { label: "LinkedIn ↗", href: profile.socialUrls.linkedin },
+    { label: "Portfolio ↗", href: profile.socialUrls.portfolio },
+  ].filter((link) => link.href.trim().length > 0);
+}
 
 export default function ProfilePage() {
   const reducedMotion = useReducedMotion();
-  const [score, setScore] = useState(7);
+  const [profile, setProfile] = useState<ProfileData>(DEFAULT_PROFILE);
+  const [hydrated, setHydrated] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const intentText = INTENTS.join("  ·  ");
+
+  const intentText = formatIntentMarquee(profile.activeIntent);
+  const intentFallback = parseActiveIntents(profile.activeIntent)[0] ?? "";
+  const links = socialLinks(profile);
+
+  useEffect(() => {
+    setProfile(loadProfile());
+    setHydrated(true);
+  }, []);
 
   useEffect(() => {
     return () => {
       if (toastTimer.current) clearTimeout(toastTimer.current);
     };
   }, []);
+
+  function persist(next: ProfileData) {
+    setProfile(next);
+    saveProfile(next);
+  }
+
+  function handleScoreChange(value: number) {
+    persist({ ...profile, introvertExtrovert: value });
+  }
 
   function showXpToast() {
     setToastVisible(true);
@@ -62,21 +90,31 @@ export default function ProfilePage() {
               RABT
             </span>
           </div>
-          <button
-            type="button"
-            aria-label={`Show ${XP_TOTAL} total XP`}
-            onClick={showXpToast}
-            className="flex min-h-11 items-center gap-2 rounded-full border border-[color-mix(in_oklch,var(--accent)_48%,var(--border))] bg-[color-mix(in_oklch,var(--accent)_9%,var(--surface))] px-3 text-foreground transition-[border-color,background,transform] duration-150 hover:border-accent hover:bg-[color-mix(in_oklch,var(--accent)_14%,transparent)] active:scale-[0.97]"
-          >
-            <span
-              className="size-[7px] rounded-full bg-accent shadow-[0_0_12px_color-mix(in_oklch,var(--accent)_80%,transparent)]"
-              aria-hidden
-            />
-            <span className="font-mono text-[9px] uppercase tracking-[0.08em] text-muted">
-              XP
-            </span>
-            <span className="font-mono text-xs font-bold">{XP_TOTAL}</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              aria-label="Account preferences"
+              onClick={() => setSettingsOpen(true)}
+              className="grid size-11 place-items-center rounded-full border border-border text-muted transition-[border-color,color,transform] duration-150 hover:border-foreground hover:text-foreground active:scale-[0.97]"
+            >
+              <Settings className="size-[18px]" strokeWidth={1.7} aria-hidden />
+            </button>
+            <button
+              type="button"
+              aria-label={`Show ${XP_TOTAL} total XP`}
+              onClick={showXpToast}
+              className="flex min-h-11 items-center gap-2 rounded-full border border-[color-mix(in_oklch,var(--accent)_48%,var(--border))] bg-[color-mix(in_oklch,var(--accent)_9%,var(--surface))] px-3 text-foreground transition-[border-color,background,transform] duration-150 hover:border-accent hover:bg-[color-mix(in_oklch,var(--accent)_14%,transparent)] active:scale-[0.97]"
+            >
+              <span
+                className="size-[7px] rounded-full bg-accent shadow-[0_0_12px_color-mix(in_oklch,var(--accent)_80%,transparent)]"
+                aria-hidden
+              />
+              <span className="font-mono text-[9px] uppercase tracking-[0.08em] text-muted">
+                XP
+              </span>
+              <span className="font-mono text-xs font-bold">{XP_TOTAL}</span>
+            </button>
+          </div>
         </header>
 
         <section className="px-0.5 pb-[17px] pt-[27px]">
@@ -93,6 +131,17 @@ export default function ProfilePage() {
         </section>
 
         <section className="rounded-[22px] border border-[color-mix(in_oklch,var(--accent)_48%,var(--border))] bg-[linear-gradient(140deg,color-mix(in_oklch,var(--accent)_10%,var(--surface)),var(--surface))] p-4 shadow-[0_20px_55px_color-mix(in_oklch,var(--bg)_78%,transparent)]">
+          <div className="mb-3 flex justify-end">
+            <button
+              type="button"
+              onClick={() => setEditOpen(true)}
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border px-3 text-[11px] text-foreground transition-[border-color,background] duration-150 hover:border-[color-mix(in_oklch,var(--accent)_45%,var(--border))] hover:bg-[color-mix(in_oklch,var(--accent)_8%,transparent)]"
+            >
+              <Pencil className="size-3.5 text-accent" strokeWidth={1.8} />
+              Edit profile
+            </button>
+          </div>
+
           <div className="grid grid-cols-[66px_1fr_auto] items-center gap-3 max-[360px]:grid-cols-[58px_1fr_auto]">
             <div
               className="grid size-[66px] place-items-center rounded-[20px] border border-[color-mix(in_oklch,var(--accent)_52%,var(--border))] font-display text-[28px] text-foreground max-[360px]:size-[58px]"
@@ -102,15 +151,20 @@ export default function ProfilePage() {
               }}
               aria-hidden
             >
-              س
+              {profile.initial}
             </div>
             <div className="min-w-0">
-              <h2 className="font-body text-lg font-bold text-foreground">
-                Sana Khalid
-              </h2>
-              <p className="mt-1 text-[11px] text-muted">
-                IMS Student · Builder
-              </p>
+              <div className="flex flex-wrap items-center gap-[7px]">
+                <h2 className="font-body text-lg font-bold text-foreground">
+                  {profile.name}
+                </h2>
+                {profile.isImsStudent ? (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-[color-mix(in_oklch,var(--accent)_55%,var(--border))] bg-[color-mix(in_oklch,var(--accent)_12%,transparent)] px-1.5 py-[3px] font-mono text-[8px] uppercase tracking-[0.04em] text-accent shadow-[0_0_14px_color-mix(in_oklch,var(--accent)_35%,transparent)] before:text-[9px] before:content-['✓']">
+                    IMS student
+                  </span>
+                ) : null}
+              </div>
+              <p className="mt-1 text-[11px] text-muted">{profile.subline}</p>
             </div>
             <span
               className="size-[9px] rounded-full bg-accent shadow-[0_0_14px_color-mix(in_oklch,var(--accent)_80%,transparent)]"
@@ -127,7 +181,7 @@ export default function ProfilePage() {
             <div className="relative mt-0.5 overflow-hidden whitespace-nowrap">
               {reducedMotion ? (
                 <p className="truncate text-xs leading-[1.45] text-foreground">
-                  {INTENTS[0]}
+                  {intentFallback}
                 </p>
               ) : (
                 <motion.p
@@ -167,7 +221,7 @@ export default function ProfilePage() {
                 </p>
               </div>
               <span className="shrink-0 font-mono text-base font-bold text-accent">
-                {score}/10
+                {profile.introvertExtrovert}/10
               </span>
             </div>
             <div className="mt-[18px] flex items-center gap-2.5">
@@ -178,9 +232,9 @@ export default function ProfilePage() {
                 type="range"
                 min={1}
                 max={10}
-                value={score}
+                value={profile.introvertExtrovert}
                 aria-label="Introvert to extrovert score"
-                onChange={(e) => setScore(Number(e.target.value))}
+                onChange={(e) => handleScoreChange(Number(e.target.value))}
                 className="w-full cursor-pointer"
                 style={{ accentColor: "var(--accent)" }}
               />
@@ -222,6 +276,33 @@ export default function ProfilePage() {
                 </strong>
               </div>
             ))}
+          </div>
+        </section>
+
+        <section>
+          <div className="flex items-end justify-between gap-3 px-0.5 pb-3 pt-[25px]">
+            <h2 className="font-display text-[21px] text-foreground">
+              What I bring
+            </h2>
+            <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted">
+              skills · services
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2 pb-1">
+            {profile.skills.length > 0 ? (
+              profile.skills.map((skill) => (
+                <span
+                  key={skill}
+                  className="inline-flex min-h-9 items-center rounded-full border border-[color-mix(in_oklch,var(--accent)_52%,var(--border))] bg-[color-mix(in_oklch,var(--accent)_8%,transparent)] px-3 text-[11px] text-foreground"
+                >
+                  {skill}
+                </span>
+              ))
+            ) : (
+              <p className="text-[11px] text-muted">
+                Add skills in Edit profile to show what you offer.
+              </p>
+            )}
           </div>
         </section>
 
@@ -274,17 +355,23 @@ export default function ProfilePage() {
             </span>
           </div>
           <div className="flex flex-wrap gap-2 pb-2">
-            {LINKS.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex min-h-11 items-center justify-center rounded-full border border-border px-[13px] font-mono text-[10px] text-foreground transition-[border-color,background] duration-150 hover:border-foreground hover:bg-[color-mix(in_oklch,var(--fg)_6%,transparent)]"
-              >
-                {link.label}
-              </a>
-            ))}
+            {links.length > 0 ? (
+              links.map((link) => (
+                <a
+                  key={link.label}
+                  href={link.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex min-h-11 items-center justify-center rounded-full border border-border px-[13px] font-mono text-[10px] text-foreground transition-[border-color,background] duration-150 hover:border-foreground hover:bg-[color-mix(in_oklch,var(--fg)_6%,transparent)]"
+                >
+                  {link.label}
+                </a>
+              ))
+            ) : (
+              <p className="text-[11px] text-muted">
+                Add social links in Edit profile.
+              </p>
+            )}
           </div>
         </section>
       </main>
@@ -300,6 +387,21 @@ export default function ProfilePage() {
       >
         {XP_TOTAL} XP earned through showing up.
       </div>
+
+      {hydrated ? (
+        <>
+          <EditProfileModal
+            open={editOpen}
+            profile={profile}
+            onClose={() => setEditOpen(false)}
+            onSave={persist}
+          />
+          <ProfileSettingsModal
+            open={settingsOpen}
+            onClose={() => setSettingsOpen(false)}
+          />
+        </>
+      ) : null}
 
       <BottomNav />
     </div>
