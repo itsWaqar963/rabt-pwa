@@ -395,7 +395,11 @@ export function CreateMeetupModal({
             <button
               type="submit"
               disabled={isOffline}
-              className="min-h-12 w-full rounded-[11px] border border-[color-mix(in_oklch,var(--accent)_65%,var(--border))] bg-accent px-3 font-bold text-[oklch(0.18_0.03_165)] transition-[filter,box-shadow] duration-150 hover:brightness-110 hover:shadow-[0_0_22px_color-mix(in_oklch,var(--accent)_35%,transparent)] disabled:cursor-not-allowed disabled:border-border disabled:bg-transparent disabled:text-muted disabled:shadow-none disabled:hover:brightness-100"
+              className={`min-h-12 w-full rounded-[11px] border px-3 font-bold transition-[filter,box-shadow] duration-150 ${
+                isOffline
+                  ? "cursor-not-allowed border-border bg-transparent text-muted opacity-50 shadow-none"
+                  : "border-[color-mix(in_oklch,var(--accent)_65%,var(--border))] bg-accent text-[oklch(0.18_0.03_165)] hover:brightness-110 hover:shadow-[0_0_22px_color-mix(in_oklch,var(--accent)_35%,transparent)]"
+              }`}
             >
               {isOffline ? "Requires Internet" : "Broadcast Meetup"}
             </button>

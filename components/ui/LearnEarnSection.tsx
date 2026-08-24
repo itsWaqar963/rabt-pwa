@@ -6,6 +6,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { ContributeLessonModal } from "@/components/ui/ContributeLessonModal";
 import { LessonQuizModal } from "@/components/ui/LessonQuizModal";
 import { XpReward } from "@/components/ui/XpReward";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { DAILY_QUIZ_GOAL } from "@/lib/learn-earn-lessons";
 import type { LearnLesson } from "@/lib/learn-earn-lessons";
 import {
@@ -17,6 +18,19 @@ import {
   type LessonContribution,
 } from "@/lib/learn-earn-store";
 
+function LessonThumbPlaceholder() {
+  return (
+    <div
+      className="absolute inset-0 grid place-items-center border border-[color-mix(in_oklch,var(--accent)_40%,var(--border))] bg-[color-mix(in_oklch,var(--bg)_90%,var(--accent))] shadow-[inset_0_0_32px_color-mix(in_oklch,var(--accent)_18%,transparent)]"
+      aria-hidden
+    >
+      <span className="grid size-9 place-items-center rounded-full border border-[color-mix(in_oklch,var(--accent)_50%,var(--border))] bg-[color-mix(in_oklch,var(--bg)_60%,transparent)] text-accent shadow-[0_0_16px_color-mix(in_oklch,var(--accent)_30%,transparent)]">
+        <Play className="size-4 fill-current" />
+      </span>
+    </div>
+  );
+}
+
 function LessonThumb({
   lesson,
   completed,
@@ -26,6 +40,14 @@ function LessonThumb({
   completed?: boolean;
   onClick?: () => void;
 }) {
+  const { isOffline } = useNetworkStatus();
+  const [imgFailed, setImgFailed] = useState(false);
+  const showPlaceholder = isOffline || imgFailed;
+
+  useEffect(() => {
+    setImgFailed(false);
+  }, [lesson.youtubeId, isOffline]);
+
   return (
     <button
       type="button"
@@ -37,20 +59,27 @@ function LessonThumb({
           : "border-[color-mix(in_oklch,var(--accent)_45%,var(--border))] hover:border-accent active:scale-[0.98]"
       }`}
     >
-      <div className="relative aspect-[9/16] bg-black/50">
-        <img
-          src={`https://img.youtube.com/vi/${lesson.youtubeId}/hqdefault.jpg`}
-          alt=""
-          className="size-full object-cover"
-        />
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_40%,color-mix(in_oklch,var(--bg)_88%,transparent))]" />
-        {!completed ? (
-          <span className="absolute inset-0 grid place-items-center">
-            <span className="grid size-9 place-items-center rounded-full border border-[color-mix(in_oklch,var(--accent)_55%,var(--border))] bg-[color-mix(in_oklch,var(--bg)_55%,transparent)] text-accent shadow-[0_0_16px_color-mix(in_oklch,var(--accent)_35%,transparent)]">
-              <Play className="size-4 fill-current" aria-hidden />
-            </span>
-          </span>
-        ) : null}
+      <div className="relative aspect-[9/16] bg-[color-mix(in_oklch,var(--bg)_70%,black)]">
+        {showPlaceholder ? (
+          <LessonThumbPlaceholder />
+        ) : (
+          <>
+            <img
+              src={`https://img.youtube.com/vi/${lesson.youtubeId}/hqdefault.jpg`}
+              alt=""
+              className="size-full object-cover"
+              onError={() => setImgFailed(true)}
+            />
+            <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_40%,color-mix(in_oklch,var(--bg)_88%,transparent))]" />
+            {!completed ? (
+              <span className="absolute inset-0 grid place-items-center">
+                <span className="grid size-9 place-items-center rounded-full border border-[color-mix(in_oklch,var(--accent)_55%,var(--border))] bg-[color-mix(in_oklch,var(--bg)_55%,transparent)] text-accent shadow-[0_0_16px_color-mix(in_oklch,var(--accent)_35%,transparent)]">
+                  <Play className="size-4 fill-current" aria-hidden />
+                </span>
+              </span>
+            ) : null}
+          </>
+        )}
       </div>
       <div className="px-2 py-2">
         <p className="line-clamp-2 text-[10px] font-semibold leading-[1.35] text-foreground">

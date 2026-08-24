@@ -244,7 +244,11 @@ export function ContributeLessonModal({
             <button
               type="submit"
               disabled={isOffline}
-              className="min-h-12 w-full rounded-[11px] border border-[color-mix(in_oklch,var(--accent)_65%,var(--border))] bg-accent font-bold text-[oklch(0.18_0.03_165)] transition-[filter] duration-150 hover:brightness-110 disabled:cursor-not-allowed disabled:border-border disabled:bg-transparent disabled:text-muted disabled:hover:brightness-100"
+              className={`min-h-12 w-full rounded-[11px] border font-bold transition-[filter] duration-150 ${
+                isOffline
+                  ? "cursor-not-allowed border-border bg-transparent text-muted opacity-50"
+                  : "border-[color-mix(in_oklch,var(--accent)_65%,var(--border))] bg-accent text-[oklch(0.18_0.03_165)] hover:brightness-110"
+              }`}
             >
               {isOffline ? "Requires Internet" : "Submit for review"}
             </button>

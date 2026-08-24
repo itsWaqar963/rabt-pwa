@@ -150,7 +150,11 @@ export default function MeetupsPage() {
             type="button"
             onClick={openCreate}
             disabled={isOffline}
-            className="inline-flex min-h-11 items-center gap-[7px] rounded-[11px] border border-[color-mix(in_oklch,var(--accent)_60%,var(--border))] bg-[color-mix(in_oklch,var(--accent)_14%,transparent)] px-3 text-[11px] font-semibold text-accent transition-[background,border-color] duration-150 hover:bg-[color-mix(in_oklch,var(--accent)_22%,transparent)] disabled:cursor-not-allowed disabled:border-border disabled:bg-transparent disabled:text-muted disabled:hover:bg-transparent max-[360px]:px-2.5"
+            className={`inline-flex min-h-11 items-center gap-[7px] rounded-[11px] border px-3 text-[11px] font-semibold transition-[background,border-color] duration-150 max-[360px]:px-2.5 ${
+              isOffline
+                ? "cursor-not-allowed border-border bg-transparent text-muted opacity-50"
+                : "border-[color-mix(in_oklch,var(--accent)_60%,var(--border))] bg-[color-mix(in_oklch,var(--accent)_14%,transparent)] text-accent hover:bg-[color-mix(in_oklch,var(--accent)_22%,transparent)]"
+            }`}
           >
             {!isOffline ? (
               <span className="text-lg font-normal leading-none">+</span>

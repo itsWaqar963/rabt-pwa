@@ -173,7 +173,13 @@ export function ReflectionCard({
         disabled={done || isOffline}
         onClick={handleSubmit}
         whileTap={done || isOffline ? undefined : { scale: 0.97 }}
-        className="mt-3 min-h-[46px] w-full rounded-[11px] border border-[color-mix(in_oklch,var(--accent)_65%,var(--border))] bg-accent text-[11px] font-bold text-[color-mix(in_oklch,var(--bg)_82%,var(--accent))] transition-[filter] duration-150 hover:brightness-110 disabled:cursor-not-allowed disabled:border-border disabled:bg-transparent disabled:text-muted disabled:filter-none"
+        className={`mt-3 min-h-[46px] w-full rounded-[11px] border text-[11px] font-bold transition-[filter] duration-150 ${
+          done
+            ? "cursor-not-allowed border-border bg-transparent text-muted opacity-70 filter-none"
+            : isOffline
+              ? "cursor-not-allowed border-border bg-transparent text-muted opacity-50 filter-none"
+              : "border-[color-mix(in_oklch,var(--accent)_65%,var(--border))] bg-accent text-[color-mix(in_oklch,var(--bg)_82%,var(--accent))] hover:brightness-110"
+        }`}
       >
         {done
           ? "+50 XP claimed"
