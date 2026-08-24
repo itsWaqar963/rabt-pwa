@@ -1,10 +1,13 @@
+import {
+  EMPTY_SOCIAL_URLS,
+  normalizeSocialUrls,
+  trimSocialUrls,
+  type SocialUrls,
+} from "@/lib/social-links";
+
 export const PROFILE_KEY = "rabt_profile";
 
-export type SocialUrls = {
-  github: string;
-  linkedin: string;
-  portfolio: string;
-};
+export type { SocialUrls };
 
 export type ProfileData = {
   name: string;
@@ -26,9 +29,10 @@ export const DEFAULT_PROFILE: ProfileData = {
     "Looking for a weekend physical meetup in Lahore|Building a focused study circle for product designers|Open to a quiet coffee and systems conversation",
   skills: ["Video Editing", "Next.js", "UI/UX", "Graphic Design"],
   socialUrls: {
+    ...EMPTY_SOCIAL_URLS,
     github: "https://github.com",
     linkedin: "https://linkedin.com",
-    portfolio: "https://example.com",
+    website: "https://example.com",
   },
   introvertExtrovert: 7,
 };
@@ -43,22 +47,12 @@ function parseStringArray(raw: unknown): string[] {
 }
 
 function parseSocialUrls(raw: unknown): SocialUrls {
-  if (!raw || typeof raw !== "object") return { ...DEFAULT_PROFILE.socialUrls };
-  const row = raw as Record<string, unknown>;
-  return {
-    github:
-      typeof row.github === "string"
-        ? row.github
-        : DEFAULT_PROFILE.socialUrls.github,
-    linkedin:
-      typeof row.linkedin === "string"
-        ? row.linkedin
-        : DEFAULT_PROFILE.socialUrls.linkedin,
-    portfolio:
-      typeof row.portfolio === "string"
-        ? row.portfolio
-        : DEFAULT_PROFILE.socialUrls.portfolio,
-  };
+  const normalized = normalizeSocialUrls(raw);
+  const hasAny = Object.values(normalized).some((v) => v.length > 0);
+  if (!hasAny && raw === undefined) {
+    return { ...DEFAULT_PROFILE.socialUrls };
+  }
+  return normalized;
 }
 
 function parseProfile(raw: string | null): ProfileData {
@@ -117,6 +111,7 @@ export function saveProfile(profile: ProfileData): void {
     PROFILE_KEY,
     JSON.stringify({
       ...profile,
+      socialUrls: trimSocialUrls(profile.socialUrls),
       introvertExtrovert: clampScore(profile.introvertExtrovert),
     }),
   );

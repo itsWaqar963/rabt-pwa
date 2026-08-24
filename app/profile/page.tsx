@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Pencil, Settings } from "lucide-react";
 import { BottomNav } from "@/components/layout/BottomNav";
+import { DigitalTrailRow } from "@/components/ui/DigitalTrailIcons";
 import { EditProfileModal } from "@/components/ui/EditProfileModal";
 import { ProfileSettingsModal } from "@/components/ui/ProfileSettingsModal";
 import {
@@ -14,6 +15,7 @@ import {
   saveProfile,
   type ProfileData,
 } from "@/lib/profile-store";
+import { getConfiguredSocialLinks } from "@/lib/social-links";
 
 const XP_TOTAL = 860;
 
@@ -23,14 +25,6 @@ const CLUSTER = [
   { label: "Gender", value: "Woman" },
   { label: "Age group", value: "23–27" },
 ] as const;
-
-function socialLinks(profile: ProfileData) {
-  return [
-    { label: "GitHub ↗", href: profile.socialUrls.github },
-    { label: "LinkedIn ↗", href: profile.socialUrls.linkedin },
-    { label: "Portfolio ↗", href: profile.socialUrls.portfolio },
-  ].filter((link) => link.href.trim().length > 0);
-}
 
 export default function ProfilePage() {
   const reducedMotion = useReducedMotion();
@@ -43,7 +37,7 @@ export default function ProfilePage() {
 
   const intentText = formatIntentMarquee(profile.activeIntent);
   const intentFallback = parseActiveIntents(profile.activeIntent)[0] ?? "";
-  const links = socialLinks(profile);
+  const digitalTrail = getConfiguredSocialLinks(profile.socialUrls);
 
   useEffect(() => {
     setProfile(loadProfile());
@@ -354,25 +348,7 @@ export default function ProfilePage() {
               bridge the gap
             </span>
           </div>
-          <div className="flex flex-wrap gap-2 pb-2">
-            {links.length > 0 ? (
-              links.map((link) => (
-                <a
-                  key={link.label}
-                  href={link.href}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex min-h-11 items-center justify-center rounded-full border border-border px-[13px] font-mono text-[10px] text-foreground transition-[border-color,background] duration-150 hover:border-foreground hover:bg-[color-mix(in_oklch,var(--fg)_6%,transparent)]"
-                >
-                  {link.label}
-                </a>
-              ))
-            ) : (
-              <p className="text-[11px] text-muted">
-                Add social links in Edit profile.
-              </p>
-            )}
-          </div>
+          <DigitalTrailRow links={digitalTrail} />
         </section>
       </main>
 

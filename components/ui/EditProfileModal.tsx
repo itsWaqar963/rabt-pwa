@@ -11,11 +11,18 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { X } from "lucide-react";
 import { meetupFieldClass } from "@/components/ui/DarkSelectPopover";
+import { SocialPlatformIcon } from "@/components/ui/SocialPlatformIcons";
 import {
   parseSkillsInput,
   type ProfileData,
-  type SocialUrls,
 } from "@/lib/profile-store";
+import {
+  SOCIAL_PLATFORMS,
+  SOCIAL_PLATFORM_META,
+  trimSocialUrls,
+  normalizeSocialUrls,
+  type SocialUrls,
+} from "@/lib/social-links";
 
 export type EditProfileModalProps = {
   open: boolean;
@@ -37,7 +44,7 @@ function toFormState(profile: ProfileData): FormState {
     activeIntent: profile.activeIntent,
     skills: [...profile.skills],
     skillInput: "",
-    socialUrls: { ...profile.socialUrls },
+    socialUrls: normalizeSocialUrls(profile.socialUrls),
     introvertExtrovert: profile.introvertExtrovert,
   };
 }
@@ -108,11 +115,7 @@ export function EditProfileModal({
       ...profile,
       activeIntent: form.activeIntent.trim(),
       skills: form.skills,
-      socialUrls: {
-        github: form.socialUrls.github.trim(),
-        linkedin: form.socialUrls.linkedin.trim(),
-        portfolio: form.socialUrls.portfolio.trim(),
-      },
+      socialUrls: trimSocialUrls(form.socialUrls),
       introvertExtrovert: form.introvertExtrovert,
     });
     onClose();
@@ -237,68 +240,64 @@ export function EditProfileModal({
                 />
               </div>
 
-              <label className="block">
+              <div>
                 <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.08em] text-muted">
-                  GitHub URL
+                  Digital trail
                 </span>
-                <input
-                  type="url"
-                  value={form.socialUrls.github}
-                  onChange={(event) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      socialUrls: {
-                        ...prev.socialUrls,
-                        github: event.target.value,
-                      },
-                    }))
-                  }
-                  placeholder="https://github.com/..."
-                  className={meetupFieldClass}
-                />
-              </label>
-
-              <label className="block">
-                <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.08em] text-muted">
-                  LinkedIn URL
-                </span>
-                <input
-                  type="url"
-                  value={form.socialUrls.linkedin}
-                  onChange={(event) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      socialUrls: {
-                        ...prev.socialUrls,
-                        linkedin: event.target.value,
-                      },
-                    }))
-                  }
-                  placeholder="https://linkedin.com/in/..."
-                  className={meetupFieldClass}
-                />
-              </label>
-
-              <label className="block">
-                <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.08em] text-muted">
-                  Portfolio URL
-                </span>
-                <input
-                  type="url"
-                  value={form.socialUrls.portfolio}
-                  onChange={(event) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      socialUrls: {
-                        ...prev.socialUrls,
-                        portfolio: event.target.value,
-                      },
-                    }))
-                  }
-                  placeholder="https://..."
-                  className={meetupFieldClass}
-                />
-              </label>
+                <p className="mb-3 text-[10px] leading-[1.45] text-muted">
+                  All optional — add only the platforms you use.
+                </p>
+                <div className="space-y-2.5">
+                  {SOCIAL_PLATFORMS.map((platform) => {
+                    const meta = SOCIAL_PLATFORM_META[platform];
+                    const filled = form.socialUrls[platform].trim().length > 0;
+                    return (
+                      <label
+                        key={platform}
+                        className={`flex items-center gap-3 rounded-[12px] border px-3 py-2.5 transition-[border-color,background] duration-150 ${
+                          filled
+                            ? "border-[color-mix(in_oklch,var(--accent)_45%,var(--border))] bg-[color-mix(in_oklch,var(--accent)_6%,transparent)]"
+                            : "border-border bg-black/30"
+                        }`}
+                      >
+                        <span
+                          className={`grid size-9 shrink-0 place-items-center rounded-full border ${
+                            filled
+                              ? "border-[color-mix(in_oklch,var(--accent)_50%,var(--border))] bg-[color-mix(in_oklch,var(--accent)_12%,transparent)] text-accent"
+                              : "border-border bg-[color-mix(in_oklch,var(--surface)_60%,transparent)] text-muted"
+                          }`}
+                          aria-hidden
+                        >
+                          <SocialPlatformIcon
+                            platform={platform}
+                            className="size-4"
+                          />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="mb-1 block font-mono text-[9px] uppercase tracking-[0.07em] text-muted">
+                            {meta.label}
+                          </span>
+                          <input
+                            type={meta.inputType}
+                            value={form.socialUrls[platform]}
+                            onChange={(event) =>
+                              setForm((prev) => ({
+                                ...prev,
+                                socialUrls: {
+                                  ...prev.socialUrls,
+                                  [platform]: event.target.value,
+                                },
+                              }))
+                            }
+                            placeholder={meta.placeholder}
+                            className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-[color-mix(in_oklch,var(--muted)_72%,transparent)]"
+                          />
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
 
               <div className="rounded-[14px] border border-border bg-[color-mix(in_oklch,var(--surface)_72%,transparent)] p-3.5">
                 <div className="flex items-center justify-between gap-2">
