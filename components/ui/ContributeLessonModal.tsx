@@ -119,7 +119,7 @@ export function ContributeLessonModal({
   return createPortal(
     <AnimatePresence>
       {open ? (
-        <div className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center">
+        <div className="rabt-modal-overlay fixed inset-0 z-[70] flex items-end justify-center px-4 pt-4 sm:items-center">
           <motion.button
             type="button"
             aria-label="Close contribute form"
@@ -134,7 +134,7 @@ export function ContributeLessonModal({
             aria-modal="true"
             aria-labelledby={titleId}
             onSubmit={handleSubmit}
-            className="relative z-[1] max-h-[calc(100dvh-24px)] w-full max-w-[424px] overflow-y-auto rounded-t-[24px] border border-[color-mix(in_oklch,var(--accent)_48%,var(--border))] bg-[linear-gradient(165deg,color-mix(in_oklch,var(--accent)_10%,var(--surface)),var(--surface)_45%,var(--bg))] p-[22px] shadow-[0_0_0_1px_color-mix(in_oklch,var(--accent)_18%,transparent),0_28px_80px_color-mix(in_oklch,var(--bg)_80%,transparent)] sm:rounded-[24px] [scrollbar-width:thin]"
+            className="rabt-modal-sheet relative z-[1] flex w-full max-w-[424px] flex-col overflow-hidden rounded-t-[24px] border border-[color-mix(in_oklch,var(--accent)_48%,var(--border))] bg-[linear-gradient(165deg,color-mix(in_oklch,var(--accent)_10%,var(--surface)),var(--surface)_45%,var(--bg))] shadow-[0_0_0_1px_color-mix(in_oklch,var(--accent)_18%,transparent),0_28px_80px_color-mix(in_oklch,var(--bg)_80%,transparent)] sm:rounded-[24px]"
             initial={
               reducedMotion ? false : { opacity: 0, y: 28, scale: 0.98 }
             }
@@ -146,7 +146,7 @@ export function ContributeLessonModal({
             }
             transition={{ duration, ease: [0.22, 1, 0.36, 1] }}
           >
-            <div className="mb-4 flex items-start justify-between gap-3">
+            <div className="mb-0 flex shrink-0 items-start justify-between gap-3 px-[22px] pt-[22px]">
               <div>
                 <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
                   Community
@@ -168,7 +168,8 @@ export function ContributeLessonModal({
               </button>
             </div>
 
-            <p className="mb-4 text-xs leading-[1.55] text-muted">
+            <div className="min-h-0 flex-1 overflow-y-auto px-[22px] [scrollbar-width:thin]">
+            <p className="mb-4 mt-4 text-xs leading-[1.55] text-muted">
               Submit a Short, question, and answers for admin review.
             </p>
 
@@ -234,13 +235,16 @@ export function ContributeLessonModal({
                 {error}
               </p>
             ) : null}
+            </div>
 
+            <div className="rabt-modal-actions shrink-0 border-t border-[color-mix(in_oklch,var(--border)_70%,transparent)] px-[22px] pt-4">
             <button
               type="submit"
-              className="mt-4 min-h-12 w-full rounded-[11px] border border-[color-mix(in_oklch,var(--accent)_65%,var(--border))] bg-accent font-bold text-[oklch(0.18_0.03_165)] transition-[filter] duration-150 hover:brightness-110"
+              className="min-h-12 w-full rounded-[11px] border border-[color-mix(in_oklch,var(--accent)_65%,var(--border))] bg-accent font-bold text-[oklch(0.18_0.03_165)] transition-[filter] duration-150 hover:brightness-110"
             >
               Submit for review
             </button>
+            </div>
           </motion.form>
         </div>
       ) : null}

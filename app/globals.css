@@ -30,6 +30,19 @@ body {
   font-family: var(--font-body);
 }
 
+/* Android PWA gesture bar: env() is often 0 — keep a floor so CTAs stay visible. */
+.rabt-modal-overlay {
+  padding-bottom: max(4.5rem, calc(env(safe-area-inset-bottom, 0px) + 1.25rem));
+}
+
+.rabt-modal-sheet {
+  max-height: calc(100dvh - max(5.5rem, env(safe-area-inset-bottom, 0px) + 2rem));
+}
+
+.rabt-modal-actions {
+  padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
+}
+
 @keyframes rabt-orbit {
   to {
     transform: rotate(360deg);

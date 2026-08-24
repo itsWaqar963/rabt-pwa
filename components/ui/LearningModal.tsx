@@ -163,7 +163,7 @@ export function LearningModal({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 24 }}
             transition={{ duration: 0.38, ease: [0.2, 0.8, 0.2, 1] }}
-            className="absolute inset-x-2.5 bottom-2.5 z-[51] max-h-[calc(100%-20px)] overflow-y-auto rounded-3xl border border-[color-mix(in_oklch,var(--fg)_24%,var(--border))] bg-[color-mix(in_oklch,var(--surface)_97%,var(--bg))] px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-[18px] shadow-[0_22px_70px_color-mix(in_oklch,var(--bg)_88%,transparent)] max-[360px]:inset-x-[7px] max-[360px]:bottom-[7px] max-[360px]:px-[13px]"
+            className="absolute inset-x-2.5 bottom-[max(10px,env(safe-area-inset-bottom,0px))] z-[51] max-h-[calc(100%-20px)] overflow-y-auto rounded-3xl border border-[color-mix(in_oklch,var(--fg)_24%,var(--border))] bg-[color-mix(in_oklch,var(--surface)_97%,var(--bg))] px-4 pb-[max(1.25rem,env(safe-area-inset-bottom,0px))] pt-[18px] shadow-[0_22px_70px_color-mix(in_oklch,var(--bg)_88%,transparent)] max-[360px]:inset-x-[7px] max-[360px]:bottom-[max(7px,env(safe-area-inset-bottom,0px))] max-[360px]:px-[13px]"
           >
             <div
               className="-mt-[3px] mx-auto mb-[17px] h-1 w-[38px] rounded-full bg-[color-mix(in_oklch,var(--muted)_68%,var(--border))]"

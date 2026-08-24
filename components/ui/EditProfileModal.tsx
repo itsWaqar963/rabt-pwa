@@ -128,7 +128,7 @@ export function EditProfileModal({
   return createPortal(
     <AnimatePresence>
       {open ? (
-        <div className="absolute inset-0 z-[70] flex items-end justify-center p-4">
+        <div className="rabt-modal-overlay absolute inset-0 z-[70] flex items-end justify-center px-4 pt-4">
           <motion.button
             type="button"
             aria-label="Close edit profile"
@@ -145,7 +145,7 @@ export function EditProfileModal({
             aria-modal="true"
             aria-labelledby={titleId}
             onSubmit={handleSubmit}
-            className="relative z-[1] max-h-[calc(100dvh-32px)] w-full max-w-[424px] overflow-y-auto overflow-x-visible rounded-[24px] border border-[color-mix(in_oklch,var(--accent)_48%,var(--border))] bg-[linear-gradient(165deg,color-mix(in_oklch,var(--accent)_10%,var(--surface)),var(--surface)_45%,var(--bg))] p-[22px] shadow-[0_0_0_1px_color-mix(in_oklch,var(--accent)_18%,transparent),0_28px_80px_color-mix(in_oklch,var(--bg)_80%,transparent)] [scrollbar-width:thin]"
+            className="rabt-modal-sheet relative z-[1] flex w-full max-w-[424px] flex-col overflow-hidden rounded-[24px] border border-[color-mix(in_oklch,var(--accent)_48%,var(--border))] bg-[linear-gradient(165deg,color-mix(in_oklch,var(--accent)_10%,var(--surface)),var(--surface)_45%,var(--bg))] shadow-[0_0_0_1px_color-mix(in_oklch,var(--accent)_18%,transparent),0_28px_80px_color-mix(in_oklch,var(--bg)_80%,transparent)]"
             initial={
               reducedMotion ? false : { opacity: 0, y: 24, scale: 0.98 }
             }
@@ -158,7 +158,7 @@ export function EditProfileModal({
             transition={{ duration, ease: [0.22, 1, 0.36, 1] }}
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex shrink-0 items-start justify-between gap-3 px-[22px] pt-[22px]">
               <div>
                 <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
                   Growth card
@@ -180,7 +180,7 @@ export function EditProfileModal({
               </button>
             </div>
 
-            <div className="mt-5 space-y-4">
+            <div className="mt-5 min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-visible px-[22px] [scrollbar-width:thin]">
               <label className="block">
                 <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.08em] text-muted">
                   Active intent
@@ -334,7 +334,7 @@ export function EditProfileModal({
               </div>
             </div>
 
-            <div className="mt-6 flex gap-2">
+            <div className="rabt-modal-actions mt-0 flex shrink-0 gap-2 border-t border-[color-mix(in_oklch,var(--border)_70%,transparent)] px-[22px] pt-4">
               <button
                 type="button"
                 onClick={onClose}
