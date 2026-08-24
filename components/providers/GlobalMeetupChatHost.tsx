@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useChatNotify } from "@/components/providers/ChatNotifyProvider";
 import { MeetupChatModal } from "@/components/ui/MeetupChatModal";
+import { useMeetupChatEligible } from "@/lib/meetup-chat-access";
 
 /**
  * Single shared MeetupChatModal for toast / SW / deep-link / card chat opens.
@@ -13,6 +14,7 @@ export function GlobalMeetupChatHost() {
   const [open, setOpen] = useState(false);
   const [meetupId, setMeetupId] = useState("");
   const [title, setTitle] = useState("Meetup");
+  const canChat = useMeetupChatEligible(meetupId);
 
   useEffect(() => {
     if (!pendingOpenChat) return;
@@ -30,7 +32,7 @@ export function GlobalMeetupChatHost() {
       onClose={() => setOpen(false)}
       meetupId={meetupId}
       meetupTitle={title}
-      canChat
+      canChat={canChat}
     />
   );
 }

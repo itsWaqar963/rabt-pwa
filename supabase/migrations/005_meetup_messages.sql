@@ -28,7 +28,7 @@ create or replace function public.can_access_meetup_chat(p_meetup_id uuid)
 returns boolean
 language sql
 stable
-security invoker
+security definer
 set search_path = public
 as $$
   select
@@ -44,6 +44,9 @@ as $$
         and jr.status = 'accepted'
     );
 $$;
+
+revoke all on function public.can_access_meetup_chat(uuid) from public;
+grant execute on function public.can_access_meetup_chat(uuid) to authenticated;
 
 drop policy if exists "Chat members can read messages" on public.messages;
 drop policy if exists "Chat members can insert own messages" on public.messages;

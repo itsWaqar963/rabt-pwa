@@ -149,6 +149,7 @@ export function MeetupChatModal({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const processedInsertsRef = useRef<Set<string>>(new Set());
@@ -270,27 +271,38 @@ export function MeetupChatModal({
     Boolean(myId) && canChat && trimmed.length > 0 && !isOffline && !sending;
 
   async function handleSend() {
-    if (!canSend || !myId) return;
+    const body = draft.trim();
+    if (!body || !myId || !canChat || isOffline || sending) return;
+
     setSending(true);
-    const body = trimmed;
+    setSendError(null);
     setDraft("");
-    const created = await sendMessage(meetupId, body, myId);
-    if (created) {
-      processedInsertsRef.current.add(created.id);
-      setMessages((prev) => {
-        if (prev.some((m) => m.id === created.id)) return prev;
-        return [...prev, { ...created, status: "sent" }];
-      });
-      void notifyMeetupMessagePush({
-        meetupId,
-        title: meetupTitle?.trim() || "RABT",
-        body: body.length > 80 ? `${body.slice(0, 77)}...` : body,
-        url: `/meetups?chat=${encodeURIComponent(meetupId)}`,
-      });
-    } else {
+
+    try {
+      const created = await sendMessage(meetupId, body, myId);
+      if (created) {
+        processedInsertsRef.current.add(created.id);
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === created.id)) return prev;
+          return [...prev, { ...created, status: "sent" }];
+        });
+        void notifyMeetupMessagePush({
+          meetupId,
+          title: meetupTitle?.trim() || "RABT",
+          body: body.length > 80 ? `${body.slice(0, 77)}...` : body,
+          url: `/meetups?chat=${encodeURIComponent(meetupId)}`,
+        });
+      } else {
+        setDraft(body);
+        setSendError("Message not sent. Check connection and try again.");
+      }
+    } catch (err) {
+      console.error("[MeetupChatModal] handleSend", err);
       setDraft(body);
+      setSendError("Message not sent. Check connection and try again.");
+    } finally {
+      setSending(false);
     }
-    setSending(false);
   }
 
   function onSubmit(event: FormEvent) {
@@ -447,6 +459,11 @@ export function MeetupChatModal({
                 <Send className="size-3.5" strokeWidth={1.8} aria-hidden />
               </button>
             </form>
+            {sendError && canChat && !isOffline ? (
+              <p className="-mt-1 mb-2 px-[18px] text-center text-[10px] text-red-400">
+                {sendError}
+              </p>
+            ) : null}
             {isOffline && canChat ? (
               <p className="-mt-1 mb-2 px-[18px] text-center font-mono text-[8px] uppercase tracking-[0.08em] text-muted opacity-50">
                 Requires Internet
