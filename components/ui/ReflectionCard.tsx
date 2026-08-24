@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 
 const FEEDBACK_TAGS = [
   "Punctual",
@@ -35,6 +36,7 @@ export function ReflectionCard({
   const [done, setDone] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [isSuccess, setIsSuccess] = useState(false);
+  const { isOffline } = useNetworkStatus();
 
   function handleStarClick(value: number) {
     setRating(value);
@@ -55,6 +57,7 @@ export function ReflectionCard({
   }
 
   function handleSubmit() {
+    if (isOffline) return;
     if (!rating) {
       setFeedback("Choose a rating before claiming your XP.");
       setIsSuccess(false);
@@ -167,12 +170,16 @@ export function ReflectionCard({
 
       <motion.button
         type="button"
-        disabled={done}
+        disabled={done || isOffline}
         onClick={handleSubmit}
-        whileTap={done ? undefined : { scale: 0.97 }}
-        className="mt-3 min-h-[46px] w-full rounded-[11px] border border-[color-mix(in_oklch,var(--accent)_65%,var(--border))] bg-accent text-[11px] font-bold text-[color-mix(in_oklch,var(--bg)_82%,var(--accent))] transition-[filter] duration-150 hover:brightness-110 disabled:cursor-default disabled:border-border disabled:bg-transparent disabled:text-muted disabled:filter-none"
+        whileTap={done || isOffline ? undefined : { scale: 0.97 }}
+        className="mt-3 min-h-[46px] w-full rounded-[11px] border border-[color-mix(in_oklch,var(--accent)_65%,var(--border))] bg-accent text-[11px] font-bold text-[color-mix(in_oklch,var(--bg)_82%,var(--accent))] transition-[filter] duration-150 hover:brightness-110 disabled:cursor-not-allowed disabled:border-border disabled:bg-transparent disabled:text-muted disabled:filter-none"
       >
-        {done ? "+50 XP claimed" : "Submit Review & Claim XP"}
+        {done
+          ? "+50 XP claimed"
+          : isOffline
+            ? "Requires Internet"
+            : "Submit Review & Claim XP"}
       </motion.button>
 
       <p

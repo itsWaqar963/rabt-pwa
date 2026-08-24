@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { MeetupStoreProvider } from "@/components/providers/MeetupStoreProvider";
 import { InstallPrompt } from "@/components/ui/InstallPrompt";
+import { OfflineBanner } from "@/components/ui/OfflineBanner";
 import "./globals.css";
 
 export const viewport: Viewport = {
@@ -34,6 +35,7 @@ export default function RootLayout({
       <body className="bg-background text-foreground font-body antialiased">
         <div className="max-w-md mx-auto min-h-screen relative overflow-hidden bg-background text-foreground">
           <MeetupStoreProvider>
+            <OfflineBanner />
             {children}
             <InstallPrompt />
           </MeetupStoreProvider>

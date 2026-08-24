@@ -6,6 +6,7 @@ import { useMeetupStore } from "@/components/providers/MeetupStoreProvider";
 import { CreateMeetupModal } from "@/components/ui/CreateMeetupModal";
 import { FilterPills } from "@/components/ui/FilterPills";
 import { MeetupCard } from "@/components/ui/MeetupCard";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import {
   DEFAULT_FILTERS,
   getFilterMetaLabel,
@@ -86,6 +87,7 @@ export default function MeetupsPage() {
     hideMeetup,
     isMeetupHidden,
   } = useMeetupStore();
+  const { isOffline } = useNetworkStatus();
 
   const seedMeetups = useMemo(
     () => getHostedMeetups(DISCOVERY_USERS),
@@ -145,10 +147,13 @@ export default function MeetupsPage() {
           <button
             type="button"
             onClick={openCreate}
-            className="inline-flex min-h-11 items-center gap-[7px] rounded-[11px] border border-[color-mix(in_oklch,var(--accent)_60%,var(--border))] bg-[color-mix(in_oklch,var(--accent)_14%,transparent)] px-3 text-[11px] font-semibold text-accent transition-[background,border-color] duration-150 hover:bg-[color-mix(in_oklch,var(--accent)_22%,transparent)] max-[360px]:px-2.5"
+            disabled={isOffline}
+            className="inline-flex min-h-11 items-center gap-[7px] rounded-[11px] border border-[color-mix(in_oklch,var(--accent)_60%,var(--border))] bg-[color-mix(in_oklch,var(--accent)_14%,transparent)] px-3 text-[11px] font-semibold text-accent transition-[background,border-color] duration-150 hover:bg-[color-mix(in_oklch,var(--accent)_22%,transparent)] disabled:cursor-not-allowed disabled:border-border disabled:bg-transparent disabled:text-muted disabled:hover:bg-transparent max-[360px]:px-2.5"
           >
-            <span className="text-lg font-normal leading-none">+</span>
-            Create Meetup
+            {!isOffline ? (
+              <span className="text-lg font-normal leading-none">+</span>
+            ) : null}
+            {isOffline ? "Requires Internet" : "Create Meetup"}
           </button>
         </header>
 

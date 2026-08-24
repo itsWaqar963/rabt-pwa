@@ -4,6 +4,7 @@ import { useEffect, useId, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { X } from "lucide-react";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { extractYoutubeId } from "@/lib/learn-earn-store";
 
 export type ContributeLessonModalProps = {
@@ -47,6 +48,7 @@ export function ContributeLessonModal({
   const [shell, setShell] = useState<HTMLElement | null>(null);
   const [form, setForm] = useState<FormState>(INITIAL);
   const [error, setError] = useState<string | null>(null);
+  const { isOffline } = useNetworkStatus();
 
   useEffect(() => {
     setShell(
@@ -77,6 +79,7 @@ export function ContributeLessonModal({
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    if (isOffline) return;
     if (!extractYoutubeId(form.youtubeUrl)) {
       setError("Paste a valid YouTube Short URL.");
       return;
@@ -240,9 +243,10 @@ export function ContributeLessonModal({
             <div className="rabt-modal-actions shrink-0 border-t border-[color-mix(in_oklch,var(--border)_70%,transparent)] px-[22px] pt-4">
             <button
               type="submit"
-              className="min-h-12 w-full rounded-[11px] border border-[color-mix(in_oklch,var(--accent)_65%,var(--border))] bg-accent font-bold text-[oklch(0.18_0.03_165)] transition-[filter] duration-150 hover:brightness-110"
+              disabled={isOffline}
+              className="min-h-12 w-full rounded-[11px] border border-[color-mix(in_oklch,var(--accent)_65%,var(--border))] bg-accent font-bold text-[oklch(0.18_0.03_165)] transition-[filter] duration-150 hover:brightness-110 disabled:cursor-not-allowed disabled:border-border disabled:bg-transparent disabled:text-muted disabled:hover:brightness-100"
             >
-              Submit for review
+              {isOffline ? "Requires Internet" : "Submit for review"}
             </button>
             </div>
           </motion.form>

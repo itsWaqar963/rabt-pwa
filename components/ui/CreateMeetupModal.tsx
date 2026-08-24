@@ -10,6 +10,7 @@ import {
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { X } from "lucide-react";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import {
   DarkSelectPopover,
   meetupFieldClass,
@@ -94,6 +95,7 @@ export function CreateMeetupModal({
   const [errors, setErrors] = useState<FieldErrors>({});
   const [contentWarning, setContentWarning] = useState<string | null>(null);
   const [openPopover, setOpenPopover] = useState<PopoverId>(null);
+  const { isOffline } = useNetworkStatus();
 
   useEffect(() => {
     setShell(
@@ -163,6 +165,7 @@ export function CreateMeetupModal({
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    if (isOffline) return;
     setOpenPopover(null);
     const nextErrors = validate(form);
     setErrors(nextErrors);
@@ -391,9 +394,10 @@ export function CreateMeetupModal({
             <div className="rabt-modal-actions shrink-0 border-t border-[color-mix(in_oklch,var(--border)_70%,transparent)] px-[22px] pt-4">
             <button
               type="submit"
-              className="min-h-12 w-full rounded-[11px] border border-[color-mix(in_oklch,var(--accent)_65%,var(--border))] bg-accent px-3 font-bold text-[oklch(0.18_0.03_165)] transition-[filter,box-shadow] duration-150 hover:brightness-110 hover:shadow-[0_0_22px_color-mix(in_oklch,var(--accent)_35%,transparent)]"
+              disabled={isOffline}
+              className="min-h-12 w-full rounded-[11px] border border-[color-mix(in_oklch,var(--accent)_65%,var(--border))] bg-accent px-3 font-bold text-[oklch(0.18_0.03_165)] transition-[filter,box-shadow] duration-150 hover:brightness-110 hover:shadow-[0_0_22px_color-mix(in_oklch,var(--accent)_35%,transparent)] disabled:cursor-not-allowed disabled:border-border disabled:bg-transparent disabled:text-muted disabled:shadow-none disabled:hover:brightness-100"
             >
-              Broadcast Meetup
+              {isOffline ? "Requires Internet" : "Broadcast Meetup"}
             </button>
             </div>
           </motion.form>
