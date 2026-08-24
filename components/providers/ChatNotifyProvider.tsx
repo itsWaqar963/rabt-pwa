@@ -14,16 +14,26 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { MessageCircle } from "lucide-react";
 import { useMeetupStore } from "@/components/providers/MeetupStoreProvider";
 import { useAuth } from "@/context/AuthContext";
+import { playChatSound } from "@/lib/chat-sounds";
 import { subscribeMessages } from "@/lib/chat-sync";
 
 type ChatToast = {
   messageId: string;
+  meetupId: string;
+  title: string;
+};
+
+type PendingOpenChat = {
+  meetupId: string;
   title: string;
 };
 
 type ChatNotifyValue = {
   activeChatMeetupId: string | null;
   setActiveChatMeetupId: (id: string | null) => void;
+  pendingOpenChat: PendingOpenChat | null;
+  requestOpenChat: (meetupId: string, title: string) => void;
+  clearPendingOpenChat: () => void;
 };
 
 const ChatNotifyContext = createContext<ChatNotifyValue | null>(null);
@@ -85,7 +95,7 @@ function ChatInboxListener({
       subscribeMessages(id, (msg) => {
         if (msg.senderId === myId) return;
         if (activeRef.current === id) return;
-        onToastRef.current({ messageId: msg.id, title });
+        onToastRef.current({ messageId: msg.id, meetupId: id, title });
       }),
     );
 
@@ -99,7 +109,15 @@ function ChatInboxListener({
   return null;
 }
 
-function ChatToastBanner({ toast }: { toast: ChatToast | null }) {
+function ChatToastBanner({
+  toast,
+  onOpen,
+  onDismiss,
+}: {
+  toast: ChatToast | null;
+  onOpen: (meetupId: string, title: string) => void;
+  onDismiss: () => void;
+}) {
   const reducedMotion = useReducedMotion();
 
   return (
@@ -107,15 +125,20 @@ function ChatToastBanner({ toast }: { toast: ChatToast | null }) {
       {toast ? (
         <motion.div
           key={toast.messageId}
-          role="status"
-          aria-live="polite"
-          initial={reducedMotion ? false : { opacity: 0, y: 16 }}
+          initial={reducedMotion ? false : { opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={reducedMotion ? undefined : { opacity: 0, y: 10 }}
+          exit={reducedMotion ? undefined : { opacity: 0, y: -12 }}
           transition={{ duration: reducedMotion ? 0.12 : 0.32, ease: EASE }}
-          className="pointer-events-none fixed inset-x-0 bottom-0 z-[65] flex justify-center px-3 pb-[max(5.5rem,calc(env(safe-area-inset-bottom,0px)+4.25rem))]"
+          className="pointer-events-none fixed inset-x-0 top-0 z-[65] flex justify-center px-3 pt-[max(12px,env(safe-area-inset-top,0px))]"
         >
-          <div className="flex w-full max-w-[calc(28rem-24px)] items-center gap-2.5 rounded-[11px] border border-[color-mix(in_oklch,var(--accent)_50%,var(--border))] bg-[color-mix(in_oklch,oklch(0.2_0.03_165)_90%,var(--surface))] px-3.5 py-2.5 shadow-[0_0_0_1px_color-mix(in_oklch,var(--accent)_18%,transparent),0_0_28px_color-mix(in_oklch,var(--accent)_22%,transparent),0_8px_24px_color-mix(in_oklch,var(--bg)_75%,transparent)] backdrop-blur-md">
+          <button
+            type="button"
+            onClick={() => {
+              onOpen(toast.meetupId, toast.title);
+              onDismiss();
+            }}
+            className="pointer-events-auto flex w-full max-w-[calc(28rem-24px)] cursor-pointer items-center gap-2.5 rounded-[11px] border border-[color-mix(in_oklch,var(--accent)_50%,var(--border))] bg-[color-mix(in_oklch,oklch(0.2_0.03_165)_90%,var(--surface))] px-3.5 py-2.5 text-left shadow-[0_0_0_1px_color-mix(in_oklch,var(--accent)_18%,transparent),0_0_28px_color-mix(in_oklch,var(--accent)_22%,transparent),0_8px_24px_color-mix(in_oklch,var(--bg)_75%,transparent)] backdrop-blur-md transition-[transform,opacity] duration-150 hover:opacity-95 active:scale-[0.99]"
+          >
             <MessageCircle
               className="size-3.5 shrink-0 text-accent"
               strokeWidth={2}
@@ -124,7 +147,7 @@ function ChatToastBanner({ toast }: { toast: ChatToast | null }) {
             <p className="min-w-0 truncate text-[11px] font-medium leading-snug text-[color-mix(in_oklch,var(--accent)_35%,var(--fg))]">
               New message in {toast.title}
             </p>
-          </div>
+          </button>
         </motion.div>
       ) : null}
     </AnimatePresence>
@@ -135,12 +158,30 @@ export function ChatNotifyProvider({ children }: { children: ReactNode }) {
   const [activeChatMeetupId, setActiveChatMeetupIdState] = useState<
     string | null
   >(null);
+  const [pendingOpenChat, setPendingOpenChat] =
+    useState<PendingOpenChat | null>(null);
   const [toast, setToast] = useState<ChatToast | null>(null);
   const seenIdsRef = useRef<Set<string>>(new Set());
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const setActiveChatMeetupId = useCallback((id: string | null) => {
     setActiveChatMeetupIdState(id);
+  }, []);
+
+  const requestOpenChat = useCallback((meetupId: string, title: string) => {
+    setPendingOpenChat({ meetupId, title });
+  }, []);
+
+  const clearPendingOpenChat = useCallback(() => {
+    setPendingOpenChat(null);
+  }, []);
+
+  const dismissToast = useCallback(() => {
+    setToast(null);
+    if (dismissTimerRef.current) {
+      clearTimeout(dismissTimerRef.current);
+      dismissTimerRef.current = null;
+    }
   }, []);
 
   const showToast = useCallback((next: ChatToast) => {
@@ -151,6 +192,7 @@ export function ChatNotifyProvider({ children }: { children: ReactNode }) {
       seenIdsRef.current = new Set(keep);
     }
     setToast(next);
+    playChatSound("ting");
     if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
     dismissTimerRef.current = setTimeout(() => {
       setToast(null);
@@ -168,8 +210,17 @@ export function ChatNotifyProvider({ children }: { children: ReactNode }) {
     () => ({
       activeChatMeetupId,
       setActiveChatMeetupId,
+      pendingOpenChat,
+      requestOpenChat,
+      clearPendingOpenChat,
     }),
-    [activeChatMeetupId, setActiveChatMeetupId],
+    [
+      activeChatMeetupId,
+      setActiveChatMeetupId,
+      pendingOpenChat,
+      requestOpenChat,
+      clearPendingOpenChat,
+    ],
   );
 
   return (
@@ -179,7 +230,11 @@ export function ChatNotifyProvider({ children }: { children: ReactNode }) {
         activeChatMeetupId={activeChatMeetupId}
         onToast={showToast}
       />
-      <ChatToastBanner toast={toast} />
+      <ChatToastBanner
+        toast={toast}
+        onOpen={requestOpenChat}
+        onDismiss={dismissToast}
+      />
     </ChatNotifyContext.Provider>
   );
 }

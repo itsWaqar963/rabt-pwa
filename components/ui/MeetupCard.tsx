@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Calendar, MapPin, MessageCircle } from "lucide-react";
+import { useChatNotify } from "@/components/providers/ChatNotifyProvider";
 import { MeetupChatModal } from "@/components/ui/MeetupChatModal";
 import type { JoinRequestStatus, MeetupRequester } from "@/lib/meetup-store";
 import { joinStatusLabel } from "@/lib/meetup-store";
@@ -120,6 +121,15 @@ export function MeetupCard({
   onRespondRequester,
 }: MeetupCardProps) {
   const [chatOpen, setChatOpen] = useState(false);
+  const { pendingOpenChat, clearPendingOpenChat } = useChatNotify();
+
+  useEffect(() => {
+    if (pendingOpenChat?.meetupId !== meetupId) return;
+    if (!showChatToggle) return;
+    setChatOpen(true);
+    clearPendingOpenChat();
+  }, [pendingOpenChat, meetupId, showChatToggle, clearPendingOpenChat]);
+
   const statusLabel =
     spotsLeft !== undefined ? `${spotsLeft} spots left` : status;
 

@@ -8,6 +8,8 @@ export type ChatMessage = {
   createdAt: string;
   senderName: string;
   senderAvatarUrl?: string;
+  /** Client-only demo ticks — not persisted */
+  status?: "sent" | "delivered" | "read";
 };
 
 type ProfileEmbed = {
