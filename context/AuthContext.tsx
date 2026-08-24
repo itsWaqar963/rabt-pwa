@@ -1,56 +1,129 @@
 "use client";
 
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
+import type { Session, User } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase";
 
-type AuthUser = { name: string; phone?: string };
+export type AuthUser = {
+  id: string;
+  name: string;
+  email?: string;
+  avatarUrl?: string;
+};
 
 type AuthState = {
   isAuthenticated: boolean;
   user: AuthUser | null;
-  login: (user: AuthUser) => void;
-  logout: () => void;
+  loading: boolean;
+  signInWithGoogle: () => Promise<void>;
+  signInWithMagicLink: (email: string) => Promise<{ error: string | null }>;
+  logout: () => Promise<void>;
 };
 
-const STORAGE_KEY = "rabt_auth_status";
-
 const AuthContext = createContext<AuthState | null>(null);
+
+function mapUser(sessionUser: User | null | undefined): AuthUser | null {
+  if (!sessionUser) return null;
+  const meta = sessionUser.user_metadata ?? {};
+  const name =
+    (typeof meta.full_name === "string" && meta.full_name) ||
+    (typeof meta.name === "string" && meta.name) ||
+    (typeof meta.preferred_username === "string" && meta.preferred_username) ||
+    sessionUser.email?.split("@")[0] ||
+    "User";
+  const avatarUrl =
+    (typeof meta.avatar_url === "string" && meta.avatar_url) ||
+    (typeof meta.picture === "string" && meta.picture) ||
+    undefined;
+
+  return {
+    id: sessionUser.id,
+    name,
+    email: sessionUser.email ?? undefined,
+    avatarUrl,
+  };
+}
+
+function applySession(
+  session: Session | null,
+  setUser: (u: AuthUser | null) => void,
+  setIsAuthenticated: (v: boolean) => void,
+) {
+  setIsAuthenticated(!!session);
+  setUser(mapUser(session?.user));
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as { isAuthenticated: boolean; user: AuthUser | null };
-        setIsAuthenticated(parsed.isAuthenticated ?? false);
-        setUser(parsed.user ?? null);
-      }
-    } catch {
-      // corrupt storage — ignore
-    }
+    let cancelled = false;
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (cancelled) return;
+      applySession(session, setUser, setIsAuthenticated);
+      setLoading(false);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      applySession(session, setUser, setIsAuthenticated);
+      setLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, []);
 
-  const login = useCallback((u: AuthUser) => {
-    setIsAuthenticated(true);
-    setUser(u);
-    if (typeof window !== "undefined") {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ isAuthenticated: true, user: u }));
-    }
+  const signInWithGoogle = useCallback(async () => {
+    const redirectTo = `${window.location.origin}/auth/callback`;
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo },
+    });
+    if (error) throw error;
   }, []);
 
-  const logout = useCallback(() => {
+  const signInWithMagicLink = useCallback(
+    async (email: string): Promise<{ error: string | null }> => {
+      const emailRedirectTo = `${window.location.origin}/auth/callback`;
+      const { error } = await supabase.auth.signInWithOtp({
+        email: email.trim(),
+        options: { emailRedirectTo },
+      });
+      return { error: error?.message ?? null };
+    },
+    [],
+  );
+
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut();
     setIsAuthenticated(false);
     setUser(null);
-    if (typeof window !== "undefined") {
-      localStorage.removeItem(STORAGE_KEY);
-    }
   }, []);
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, user, login, logout }}>
+    <AuthContext.Provider
+      value={{
+        isAuthenticated,
+        user,
+        loading,
+        signInWithGoogle,
+        signInWithMagicLink,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

@@ -2,8 +2,10 @@
 
 import { useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { X } from "lucide-react";
+import { LogOut, X } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 export type ProfileSettingsModalProps = {
   open: boolean;
@@ -37,12 +39,26 @@ export function ProfileSettingsModal({
 }: ProfileSettingsModalProps) {
   const titleId = useId();
   const reducedMotion = useReducedMotion();
+  const router = useRouter();
+  const { logout } = useAuth();
   const [shell, setShell] = useState<HTMLElement | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
   const [prefs, setPrefs] = useState<Record<PreferenceKey, boolean>>({
     notifications: true,
     meetupReminders: true,
     profileVisible: true,
   });
+
+  async function handleLogout() {
+    setSigningOut(true);
+    try {
+      await logout();
+      onClose();
+      router.replace("/welcome");
+    } finally {
+      setSigningOut(false);
+    }
+  }
 
   useEffect(() => {
     setShell(
@@ -174,7 +190,16 @@ export function ProfileSettingsModal({
             </ul>
             </div>
 
-            <div className="rabt-modal-actions shrink-0 px-[22px] pt-4">
+            <div className="rabt-modal-actions shrink-0 flex flex-col gap-2 px-[22px] pt-4">
+            <button
+              type="button"
+              onClick={() => void handleLogout()}
+              disabled={signingOut}
+              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[12px] border border-[color-mix(in_oklch,oklch(0.65_0.18_25)_40%,var(--border))] px-3 text-sm text-[oklch(0.78_0.12_25)] transition-colors hover:border-[oklch(0.7_0.15_25)] disabled:opacity-50"
+            >
+              <LogOut className="size-4" strokeWidth={1.8} />
+              {signingOut ? "Signing out…" : "Sign out"}
+            </button>
             <button
               type="button"
               onClick={onClose}
