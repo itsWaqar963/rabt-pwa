@@ -295,6 +295,9 @@ export function MeetupChatModal({
       } else {
         setDraft(body);
         setSendError("Message not sent. Check connection and try again.");
+        console.error(
+          "[MeetupChatModal] sendMessage returned null — see [chat-sync] logs above",
+        );
       }
     } catch (err) {
       console.error("[MeetupChatModal] handleSend", err);

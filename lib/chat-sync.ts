@@ -1,4 +1,12 @@
+import { isLocalCreatedMeetupId } from "@/lib/meetup-store";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+
+type PostgrestErrorLike = {
+  message?: string;
+  code?: string;
+  details?: string;
+  hint?: string;
+};
 
 export type ChatMessage = {
   id: string;
@@ -186,8 +194,57 @@ type ProfileRow = {
 
 const PROFILE_EMBED_COLS = "full_name, avatar_url";
 
+function formatSyncError(error: unknown): Record<string, unknown> {
+  if (!error || typeof error !== "object") {
+    return { raw: error };
+  }
+  const e = error as PostgrestErrorLike;
+  return {
+    message: e.message,
+    code: e.code,
+    details: e.details,
+    hint: e.hint,
+  };
+}
+
 function logRemoteError(scope: string, error: unknown): void {
-  console.error(`[chat-sync] ${scope}`, error);
+  console.error(`[chat-sync] ${scope}`, formatSyncError(error));
+}
+
+/** Verified JWT user id for inserts — never trust React state alone. */
+async function resolveChatSenderId(
+  senderHint?: string,
+): Promise<string | null> {
+  const { data, error } = await supabase.auth.getUser();
+  if (data.user?.id) {
+    if (senderHint && senderHint !== data.user.id) {
+      console.warn("[chat-sync] sendMessage sender hint mismatch", {
+        senderHint,
+        sessionUserId: data.user.id,
+      });
+    }
+    return data.user.id;
+  }
+
+  logRemoteError("sendMessage.getUser", error ?? "no user");
+
+  const refreshed = await supabase.auth.refreshSession();
+  const sessionUserId = refreshed.data.session?.user?.id ?? null;
+  if (sessionUserId) {
+    if (senderHint && senderHint !== sessionUserId) {
+      console.warn("[chat-sync] sendMessage sender hint mismatch", {
+        senderHint,
+        sessionUserId,
+      });
+    }
+    return sessionUserId;
+  }
+
+  logRemoteError(
+    "sendMessage.refreshSession",
+    refreshed.error ?? "no session after refresh",
+  );
+  return null;
 }
 
 function asProfile(
@@ -304,27 +361,6 @@ export async function fetchMessages(meetupId: string): Promise<ChatMessage[]> {
   }
 }
 
-async function ensureChatSession(senderId: string): Promise<boolean> {
-  const { data, error } = await supabase.auth.getSession();
-  if (error) {
-    logRemoteError("sendMessage.session", error);
-    return false;
-  }
-
-  const uid = data.session?.user?.id;
-  if (!uid) {
-    logRemoteError("sendMessage.session", "missing auth session");
-    return false;
-  }
-
-  if (uid !== senderId) {
-    logRemoteError("sendMessage.session", "sender/session id mismatch");
-    return false;
-  }
-
-  return true;
-}
-
 async function fetchOwnMessageRow(
   meetupId: string,
   senderId: string,
@@ -351,48 +387,57 @@ async function fetchOwnMessageRow(
 export async function sendMessage(
   meetupId: string,
   body: string,
-  senderId: string,
+  senderIdHint?: string,
 ): Promise<ChatMessage | null> {
-  if (!isSupabaseConfigured) return null;
+  if (!isSupabaseConfigured) {
+    logRemoteError("sendMessage", "supabase env not configured");
+    return null;
+  }
 
   const trimmed = body.trim();
-  if (!trimmed || trimmed.length > 2000) return null;
-  if (!meetupId.trim()) return null;
+  if (!trimmed || trimmed.length > 2000) {
+    logRemoteError("sendMessage", "invalid body length");
+    return null;
+  }
+
+  const meetupKey = meetupId.trim();
+  if (!meetupKey) {
+    logRemoteError("sendMessage", "missing meetupId");
+    return null;
+  }
+
+  if (isLocalCreatedMeetupId(meetupKey)) {
+    logRemoteError("sendMessage", {
+      code: "LOCAL_MEETUP",
+      message: "Meetup not synced to Supabase — chat requires remote meetup id",
+      meetupId: meetupKey,
+    });
+    return null;
+  }
 
   try {
-    const authed = await ensureChatSession(senderId);
-    if (!authed) return null;
+    const senderId = await resolveChatSenderId(senderIdHint);
+    if (!senderId) return null;
 
     const payload = {
-      meetup_id: meetupId,
+      meetup_id: meetupKey,
       sender_id: senderId,
       body: trimmed,
     };
 
-    const inserted = await supabase
-      .from("messages")
-      .insert(payload)
-      .select("id, meetup_id, sender_id, body, created_at")
-      .maybeSingle();
+    const { error: insertError } = await supabase.from("messages").insert(payload);
 
-    let row = (inserted.data as MessageRow | null) ?? null;
-
-    if (inserted.error) {
-      logRemoteError("sendMessage.insert", inserted.error);
-      // Insert may still have committed while RETURNING was RLS-filtered.
-      if (inserted.error.code !== "PGRST116") {
-        return null;
-      }
-      row = await fetchOwnMessageRow(meetupId, senderId, trimmed);
-      if (!row) return null;
+    if (insertError) {
+      logRemoteError("sendMessage.insert", insertError);
     }
 
+    const row = await fetchOwnMessageRow(meetupKey, senderId, trimmed);
+
     if (!row) {
-      row = await fetchOwnMessageRow(meetupId, senderId, trimmed);
-      if (!row) {
+      if (!insertError) {
         logRemoteError("sendMessage", "insert ok but row not readable");
-        return null;
       }
+      return null;
     }
 
     const profiles = await fetchProfilesByIds([senderId]);
