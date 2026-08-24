@@ -25,6 +25,7 @@ import {
   type ChatMessage,
 } from "@/lib/chat-sync";
 import { initialsFromName } from "@/lib/profile-store";
+import { notifyMeetupMessagePush } from "@/lib/push-subscribe";
 
 export type MeetupChatModalProps = {
   open: boolean;
@@ -279,6 +280,12 @@ export function MeetupChatModal({
       setMessages((prev) => {
         if (prev.some((m) => m.id === created.id)) return prev;
         return [...prev, { ...created, status: "sent" }];
+      });
+      void notifyMeetupMessagePush({
+        meetupId,
+        title: meetupTitle?.trim() || "RABT",
+        body: body.length > 80 ? `${body.slice(0, 77)}...` : body,
+        url: `/meetups?chat=${encodeURIComponent(meetupId)}`,
       });
     } else {
       setDraft(body);
