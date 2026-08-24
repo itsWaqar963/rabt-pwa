@@ -20,6 +20,8 @@ import {
   DISCOVERY_USERS,
   filterDiscoveryUsers,
   findDiscoveryUser,
+  hostedMeetupToDiscoveryUser,
+  type DiscoveryUser,
 } from "@/lib/discovery-users";
 
 export default function DiscoverPage() {
@@ -29,6 +31,8 @@ export default function DiscoverPage() {
   const mainRef = useRef<HTMLElement>(null);
   const filterSentinelRef = useRef<HTMLDivElement>(null);
   const {
+    remoteMeetups,
+    loading,
     isMeetupRequested,
     isConnectAcked,
     toggleMeetupRequest,
@@ -62,17 +66,25 @@ export default function DiscoverPage() {
     return () => observer.disconnect();
   }, []);
 
+  const sourceUsers = useMemo((): DiscoveryUser[] => {
+    const remoteUsers = remoteMeetups
+      .filter((m) => !isMeetupHidden(m.id))
+      .map(hostedMeetupToDiscoveryUser);
+    if (remoteUsers.length > 0) return remoteUsers;
+    return DISCOVERY_USERS;
+  }, [remoteMeetups, isMeetupHidden]);
+
   const feed = useMemo(
     () =>
-      filterDiscoveryUsers(DISCOVERY_USERS, filters).filter((user) => {
+      filterDiscoveryUsers(sourceUsers, filters).filter((user) => {
         if (isUserHidden(user.id)) return false;
         if (user.meetup && isMeetupHidden(user.meetup.id)) return false;
         return true;
       }),
-    [filters, isUserHidden, isMeetupHidden],
+    [sourceUsers, filters, isUserHidden, isMeetupHidden],
   );
   const metaLabel = getFilterMetaLabel(filters);
-  const selectedUser = findDiscoveryUser(DISCOVERY_USERS, selectedUserId);
+  const selectedUser = findDiscoveryUser(sourceUsers, selectedUserId);
 
   return (
     <AuthGuard>
@@ -133,12 +145,23 @@ export default function DiscoverPage() {
               Nearby intentions
             </h2>
             <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted">
-              {feed.length} clusters · {metaLabel}
+              {loading && remoteMeetups.length === 0
+                ? "Loading clusters…"
+                : `${feed.length} clusters · ${metaLabel}`}
             </span>
           </div>
 
           <div className="grid gap-3 pb-2">
-            {feed.length === 0 ? (
+            {loading && feed.length === 0 ? (
+              <div className="grid gap-3">
+                {[0, 1, 2].map((i) => (
+                  <div
+                    key={i}
+                    className="h-40 animate-pulse rounded-[14px] border border-border bg-[color-mix(in_oklch,var(--surface)_60%,transparent)]"
+                  />
+                ))}
+              </div>
+            ) : feed.length === 0 ? (
               <EmptyClusters onReset={() => setFilters(DEFAULT_FILTERS)} />
             ) : (
               feed.map((user) => (

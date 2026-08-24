@@ -7,6 +7,7 @@ import { useMeetupStore } from "@/components/providers/MeetupStoreProvider";
 import { CreateMeetupModal } from "@/components/ui/CreateMeetupModal";
 import { FilterPills } from "@/components/ui/FilterPills";
 import { MeetupCard } from "@/components/ui/MeetupCard";
+import { useAuth } from "@/context/AuthContext";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import {
   DEFAULT_FILTERS,
@@ -21,6 +22,7 @@ import {
 import {
   createdMeetupToHosted,
   filterHostedMeetups,
+  isActiveJoinRequest,
   type JoinRequestStatus,
   type MeetupRequester,
 } from "@/lib/meetup-store";
@@ -75,10 +77,12 @@ export default function MeetupsPage() {
   const [activeTab, setActiveTab] = useState<Tab>("explore");
   const [createOpen, setCreateOpen] = useState(false);
   const [filters, setFilters] = useState<DiscoveryFilters>(DEFAULT_FILTERS);
+  const { user } = useAuth();
 
   const {
     createdMeetups,
-    meetupIds,
+    remoteMeetups,
+    loading,
     isMeetupRequested,
     getJoinStatus,
     toggleMeetupRequest,
@@ -103,20 +107,50 @@ export default function MeetupsPage() {
     [createdMeetups, isMeetupHidden],
   );
 
-  const allExplore = useMemo(
-    () =>
-      [...createdAsHosted, ...seedMeetups].filter((m) => !isMeetupHidden(m.id)),
-    [createdAsHosted, seedMeetups, isMeetupHidden],
-  );
+  const allExplore = useMemo(() => {
+    const byId = new Map<string, HostedMeetup>();
+    for (const m of remoteMeetups) {
+      if (!isMeetupHidden(m.id)) byId.set(m.id, m);
+    }
+    for (const m of createdAsHosted) {
+      if (!byId.has(m.id)) byId.set(m.id, m);
+    }
+    // Fallback seed only when remote empty (offline / unconfigured / empty DB)
+    if (byId.size === 0) {
+      for (const m of seedMeetups) {
+        if (!isMeetupHidden(m.id)) byId.set(m.id, m);
+      }
+    }
+    return [...byId.values()];
+  }, [remoteMeetups, createdAsHosted, seedMeetups, isMeetupHidden]);
 
   const exploreMeetups = useMemo(
     () => filterHostedMeetups(allExplore, filters.country, filters.city),
     [allExplore, filters.country, filters.city],
   );
 
+  const hostedMine = useMemo(() => {
+    const authId = user?.id;
+    return allExplore.filter((m) => {
+      if (authId && m.hostUserId === authId) return true;
+      if (m.hostUserId === "self" && createdMeetups.some((c) => c.id === m.id)) {
+        return true;
+      }
+      return m.source === "created";
+    });
+  }, [allExplore, user?.id, createdMeetups]);
+
   const joinedMeetups = useMemo(
-    () => allExplore.filter((m) => meetupIds.has(m.id)),
-    [allExplore, meetupIds],
+    () =>
+      allExplore.filter((m) => {
+        const status = getJoinStatus(m.id);
+        if (!isActiveJoinRequest(status)) return false;
+        // Exclude own hosted from Joined section
+        if (user?.id && m.hostUserId === user.id) return false;
+        if (m.source === "created" && m.hostUserId === "self") return false;
+        return true;
+      }),
+    [allExplore, getJoinStatus, user?.id],
   );
 
   const metaLabel = getFilterMetaLabel(filters);
@@ -226,25 +260,39 @@ export default function MeetupsPage() {
                   Near you
                 </h2>
                 <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted">
-                  {exploreMeetups.length} meetups · {metaLabel}
+                  {loading
+                    ? "Loading…"
+                    : `${exploreMeetups.length} meetups · ${metaLabel}`}
                 </span>
               </div>
 
-              {exploreMeetups.length === 0 ? (
+              {loading && exploreMeetups.length === 0 ? (
+                <div className="grid gap-3 pb-2">
+                  {[0, 1, 2].map((i) => (
+                    <div
+                      key={i}
+                      className="h-36 animate-pulse rounded-[14px] border border-border bg-[color-mix(in_oklch,var(--surface)_60%,transparent)]"
+                    />
+                  ))}
+                </div>
+              ) : exploreMeetups.length === 0 ? (
                 <div className="border border-dashed border-border px-5 py-8 text-center text-xs text-muted">
                   No meetups match these filters. Try another city or broadcast
                   one.
                 </div>
               ) : (
                 <div className="grid gap-3 pb-2">
-                  {exploreMeetups.map((meetup) =>
-                    renderMeetupCard(meetup, {
+                  {exploreMeetups.map((meetup) => {
+                    const isHost =
+                      (user?.id && meetup.hostUserId === user.id) ||
+                      meetup.source === "created";
+                    return renderMeetupCard(meetup, {
                       requested: isMeetupRequested(meetup.id),
                       onRequestToggle: () => toggleMeetupRequest(meetup.id),
-                      hideRequest: meetup.source === "created",
+                      hideRequest: isHost,
                       onHide: () => hideMeetup(meetup.id),
-                    }),
-                  )}
+                    });
+                  })}
                 </div>
               )}
             </>
@@ -255,7 +303,7 @@ export default function MeetupsPage() {
                   Your calendar
                 </h2>
                 <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted">
-                  {createdAsHosted.length + joinedMeetups.length} saved
+                  {hostedMine.length + joinedMeetups.length} saved
                 </span>
               </div>
 
@@ -264,14 +312,14 @@ export default function MeetupsPage() {
                   <h3 className="mb-3 px-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-muted">
                     Hosted
                   </h3>
-                  {createdAsHosted.length === 0 ? (
+                  {hostedMine.length === 0 ? (
                     <div className="border border-dashed border-border px-5 py-6 text-center text-xs text-muted">
                       You have not hosted a meetup yet. Create one to see it
                       here.
                     </div>
                   ) : (
                     <div className="grid gap-3">
-                      {createdAsHosted.map((meetup) =>
+                      {hostedMine.map((meetup) =>
                         renderMeetupCard(meetup, {
                           requested: false,
                           hideRequest: true,
@@ -323,7 +371,9 @@ export default function MeetupsPage() {
       <CreateMeetupModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        onSubmit={addCreatedMeetup}
+        onSubmit={(input) => {
+          void addCreatedMeetup(input);
+        }}
       />
     </div>
     </AuthGuard>

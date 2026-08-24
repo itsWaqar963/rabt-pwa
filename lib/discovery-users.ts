@@ -1,5 +1,6 @@
 import type { UserCardProps } from "@/components/ui/UserCard";
 import type { DiscoveryFilters } from "@/lib/discovery-filters";
+import type { MeetupCategory } from "@/lib/meetup-store";
 
 export type DiscoveryUserLinks = {
   github?: string;
@@ -43,7 +44,23 @@ export type HostedMeetup = {
   spotsLeft: number;
   city: string;
   country: string;
-  source: "seed" | "created";
+  source: "seed" | "created" | "remote";
+  /** Host profile signals for Discover filters (remote) */
+  hostGender?: "women" | "men";
+  hostAgeGroup?: "18-24" | "25-34" | "35-44";
+  hostAvatarUrl?: string;
+  hostSubline?: string;
+  hostIntent?: string;
+  hostSkills?: string[];
+  hostInitial?: string;
+  /** Raw create fields when available */
+  date?: string;
+  time?: string;
+  category?: MeetupCategory;
+  venue?: string;
+  maxSpots?: number;
+  descriptionRaw?: string;
+  createdAt?: string;
 };
 
 export const DISCOVERY_USERS: DiscoveryUser[] = [
@@ -400,4 +417,46 @@ export function getHostedMeetups(users: DiscoveryUser[]): HostedMeetup[] {
       },
     ];
   });
+}
+
+/** Build people-first Discover cards from remote open meetups + host profile. */
+export function hostedMeetupToDiscoveryUser(
+  meetup: HostedMeetup,
+): DiscoveryUser {
+  const name = meetup.organizerName || "Host";
+  const intent =
+    meetup.hostIntent?.trim() ||
+    meetup.description ||
+    `Hosting ${meetup.title}`;
+  const skills = (meetup.hostSkills ?? []).slice(0, 4);
+  const tags = [
+    meetup.city,
+    meetup.country,
+    ...skills,
+  ].filter(Boolean);
+
+  return {
+    id: meetup.id,
+    name,
+    initial: meetup.hostInitial || name.charAt(0) || "?",
+    subline: meetup.hostSubline || meetup.organizerRole || "Host",
+    intents: [intent, meetup.title],
+    tags,
+    avatarVariant: "default",
+    country: meetup.country,
+    city: meetup.city,
+    gender: meetup.hostGender ?? "men",
+    ageGroup: meetup.hostAgeGroup ?? "25-34",
+    personalityScore: 5,
+    links: {},
+    meetup: {
+      id: meetup.id,
+      title: meetup.title,
+      venue: meetup.location,
+      when: meetup.when,
+      description: meetup.description,
+      spotsLeft: meetup.spotsLeft,
+      category: meetup.category?.toLowerCase(),
+    },
+  };
 }

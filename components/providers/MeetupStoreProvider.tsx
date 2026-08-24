@@ -9,6 +9,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useAuth } from "@/context/AuthContext";
+import type { HostedMeetup } from "@/lib/discovery-users";
 import {
   CREATED_MEETUPS_KEY,
   EMPTY_ACKS,
@@ -21,6 +23,7 @@ import {
   buildCreatedMeetup,
   ensureHostRequesters,
   isActiveJoinRequest,
+  isLocalCreatedMeetupId,
   migrateJoinRequests,
   parseAckState,
   parseCreatedMeetups,
@@ -38,9 +41,22 @@ import {
   type MeetupAckState,
   type MeetupRequester,
 } from "@/lib/meetup-store";
+import {
+  deletePendingJoinRequest,
+  fetchHostJoinRequests,
+  fetchMeetupsWithHosts,
+  fetchMyJoinRequests,
+  hostedToCreatedMeetup,
+  insertJoinRequest,
+  insertMeetup,
+  updateJoinRequestStatus,
+} from "@/lib/meetup-sync";
+import { isSupabaseConfigured } from "@/lib/supabase";
 
 type MeetupStoreValue = {
   hydrated: boolean;
+  loading: boolean;
+  remoteMeetups: HostedMeetup[];
   meetupIds: ReadonlySet<string>;
   connectIds: ReadonlySet<string>;
   createdMeetups: CreatedMeetup[];
@@ -55,7 +71,7 @@ type MeetupStoreValue = {
   isMeetupHidden: (meetupId: string) => boolean;
   toggleMeetupRequest: (meetupId: string) => void;
   toggleConnect: (userId: string) => void;
-  addCreatedMeetup: (input: CreateMeetupInput) => CreatedMeetup;
+  addCreatedMeetup: (input: CreateMeetupInput) => Promise<CreatedMeetup>;
   getRequesters: (meetupId: string) => MeetupRequester[];
   respondToRequester: (
     meetupId: string,
@@ -64,12 +80,22 @@ type MeetupStoreValue = {
   ) => void;
   hideUser: (userId: string) => void;
   hideMeetup: (meetupId: string) => void;
+  refresh: () => Promise<void>;
 };
 
 const MeetupStoreContext = createContext<MeetupStoreValue | null>(null);
 
+function canUseRemote(userId: string | undefined | null): boolean {
+  return Boolean(isSupabaseConfigured && userId);
+}
+
 export function MeetupStoreProvider({ children }: { children: ReactNode }) {
+  const { user, loading: authLoading } = useAuth();
+  const userId = user?.id ?? null;
+
   const [hydrated, setHydrated] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [remoteMeetups, setRemoteMeetups] = useState<HostedMeetup[]>([]);
   const [acks, setAcks] = useState<MeetupAckState>(EMPTY_ACKS);
   const [createdMeetups, setCreatedMeetups] = useState<CreatedMeetup[]>([]);
   const [joinRequests, setJoinRequests] = useState<JoinRequestsState>({});
@@ -104,6 +130,72 @@ export function MeetupStoreProvider({ children }: { children: ReactNode }) {
     setHidden(hiddenIds);
     setHydrated(true);
   }, []);
+
+  const refresh = useCallback(async () => {
+    if (!canUseRemote(userId) || !userId) {
+      setRemoteMeetups([]);
+      return;
+    }
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const [meetups, myJoins, hostReqs] = await Promise.all([
+        fetchMeetupsWithHosts(),
+        fetchMyJoinRequests(userId),
+        fetchHostJoinRequests(userId),
+      ]);
+
+      setRemoteMeetups(meetups);
+
+      const hostedMine = meetups.filter((m) => m.hostUserId === userId);
+      const remoteCreated = hostedMine
+        .map(hostedToCreatedMeetup)
+        .filter((m): m is CreatedMeetup => m !== null);
+
+      setCreatedMeetups((prev) => {
+        const localOnly = prev.filter((m) => isLocalCreatedMeetupId(m.id));
+        const byId = new Map<string, CreatedMeetup>();
+        for (const m of remoteCreated) byId.set(m.id, m);
+        for (const m of localOnly) {
+          if (!byId.has(m.id)) byId.set(m.id, m);
+        }
+        return [...byId.values()];
+      });
+
+      setJoinRequests((prev) => ({ ...prev, ...myJoins }));
+
+      setHostRequesters((prev) => {
+        const next: HostRequestersState = { ...prev };
+        for (const meetup of hostedMine) {
+          next[meetup.id] = hostReqs[meetup.id] ?? [];
+        }
+        for (const [meetupId, list] of Object.entries(hostReqs)) {
+          next[meetupId] = list;
+        }
+        return next;
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    if (!hydrated || authLoading) return;
+    void refresh();
+  }, [hydrated, authLoading, refresh]);
+
+  useEffect(() => {
+    if (!hydrated || !canUseRemote(userId)) return;
+
+    const onFocus = () => {
+      void refresh();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [hydrated, userId, refresh]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -175,12 +267,12 @@ export function MeetupStoreProvider({ children }: { children: ReactNode }) {
   );
 
   const isConnectAcked = useCallback(
-    (userId: string) => connectIds.has(userId),
+    (userIdArg: string) => connectIds.has(userIdArg),
     [connectIds],
   );
 
   const isUserHidden = useCallback(
-    (userId: string) => hiddenUserIds.has(userId),
+    (id: string) => hiddenUserIds.has(id),
     [hiddenUserIds],
   );
 
@@ -189,34 +281,136 @@ export function MeetupStoreProvider({ children }: { children: ReactNode }) {
     [hiddenMeetupIds],
   );
 
-  const toggleMeetupRequest = useCallback((meetupId: string) => {
-    setJoinRequests((prev) => {
-      const current = prev[meetupId];
-      if (current === "pending" || current === "accepted") {
-        const next = { ...prev };
-        delete next[meetupId];
-        return next;
-      }
-      return { ...prev, [meetupId]: "pending" };
-    });
-  }, []);
+  const toggleMeetupRequest = useCallback(
+    (meetupId: string) => {
+      const current = joinRequests[meetupId];
 
-  const toggleConnect = useCallback((userId: string) => {
+      if (current === "pending" || current === "accepted") {
+        // Optimistic local cancel; remote delete only for pending (may RLS-fail)
+        setJoinRequests((prev) => {
+          const next = { ...prev };
+          delete next[meetupId];
+          return next;
+        });
+        if (
+          current === "pending" &&
+          canUseRemote(userId) &&
+          userId &&
+          typeof navigator !== "undefined" &&
+          navigator.onLine
+        ) {
+          void deletePendingJoinRequest(meetupId, userId);
+        }
+        return;
+      }
+
+      setJoinRequests((prev) => ({ ...prev, [meetupId]: "pending" }));
+
+      if (
+        !canUseRemote(userId) ||
+        !userId ||
+        typeof navigator === "undefined" ||
+        !navigator.onLine
+      ) {
+        return;
+      }
+
+      void insertJoinRequest(meetupId, userId).then((status) => {
+        if (!status) {
+          console.error(
+            "[meetup-store] insertJoinRequest failed; keeping local pending",
+          );
+          return;
+        }
+        setJoinRequests((prev) => ({ ...prev, [meetupId]: status }));
+      });
+    },
+    [joinRequests, userId],
+  );
+
+  const toggleConnect = useCallback((connectUserId: string) => {
     setAcks((prev) => ({
       ...prev,
-      connectIds: toggleIdInList(prev.connectIds, userId),
+      connectIds: toggleIdInList(prev.connectIds, connectUserId),
     }));
   }, []);
 
-  const addCreatedMeetup = useCallback((input: CreateMeetupInput) => {
-    const next = buildCreatedMeetup(input);
-    setCreatedMeetups((prev) => [next, ...prev]);
-    setHostRequesters((prev) => ({
-      ...prev,
-      [next.id]: seedPendingRequesters(next.id),
-    }));
-    return next;
-  }, []);
+  const addCreatedMeetup = useCallback(
+    async (input: CreateMeetupInput): Promise<CreatedMeetup> => {
+      const applyLocal = (next: CreatedMeetup, seed: boolean) => {
+        setCreatedMeetups((prev) => [next, ...prev.filter((m) => m.id !== next.id)]);
+        if (seed) {
+          setHostRequesters((prev) => ({
+            ...prev,
+            [next.id]: seedPendingRequesters(next.id),
+          }));
+        } else {
+          setHostRequesters((prev) => ({
+            ...prev,
+            [next.id]: prev[next.id] ?? [],
+          }));
+        }
+        return next;
+      };
+
+      if (
+        canUseRemote(userId) &&
+        userId &&
+        typeof navigator !== "undefined" &&
+        navigator.onLine
+      ) {
+        const remote = await insertMeetup(userId, input);
+        if (remote) {
+          const hosted = await fetchMeetupsWithHosts();
+          if (hosted.length > 0) {
+            setRemoteMeetups(hosted);
+          } else {
+            const asHosted: HostedMeetup = {
+              id: remote.id,
+              kind: `Physical gathering · ${remote.category.toLowerCase()}`,
+              title: remote.title,
+              status: `${remote.maxSpots} spots left`,
+              description:
+                remote.description.trim() ||
+                `${remote.category} meetup at ${remote.venue}.`,
+              location: remote.venue,
+              when: `${remote.date} · ${remote.time}`,
+              organizerName: user?.name ?? "You",
+              organizerRole: "Host",
+              hostUserId: userId,
+              spotsLeft: remote.maxSpots,
+              city: remote.city,
+              country: remote.country,
+              source: "remote",
+              date: remote.date,
+              time: remote.time,
+              category: remote.category,
+              venue: remote.venue,
+              maxSpots: remote.maxSpots,
+              descriptionRaw: remote.description,
+              createdAt: remote.createdAt,
+            };
+            setRemoteMeetups((prev) =>
+              prev.some((m) => m.id === remote.id)
+                ? prev
+                : [asHosted, ...prev],
+            );
+          }
+          return applyLocal(remote, false);
+        }
+        console.error(
+          "[meetup-store] insertMeetup failed; falling back to local create",
+        );
+      }
+
+      const next = buildCreatedMeetup(input);
+      if (userId) {
+        next.hostUserId = userId;
+      }
+      return applyLocal(next, true);
+    },
+    [userId, user?.name],
+  );
 
   const getRequesters = useCallback(
     (meetupId: string) => hostRequesters[meetupId] ?? [],
@@ -229,28 +423,50 @@ export function MeetupStoreProvider({ children }: { children: ReactNode }) {
       requesterId: string,
       status: "accepted" | "declined",
     ) => {
+      const list = hostRequesters[meetupId];
+      const existing = list?.find((r) => r.id === requesterId);
+
       setHostRequesters((prev) => {
-        const list = prev[meetupId];
-        if (!list) return prev;
+        const current = prev[meetupId];
+        if (!current) return prev;
         return {
           ...prev,
-          [meetupId]: list.map((r) =>
+          [meetupId]: current.map((r) =>
             r.id === requesterId ? { ...r, status } : r,
           ),
         };
       });
-      // Single-device demo: Accept mirrors attendee path for this meetup.
-      if (status === "accepted") {
+
+      // Same-device: if I accepted myself as requester, mirror join status
+      if (status === "accepted" && requesterId === userId) {
         setJoinRequests((prev) => ({ ...prev, [meetupId]: "accepted" }));
       }
+
+      if (
+        canUseRemote(userId) &&
+        typeof navigator !== "undefined" &&
+        navigator.onLine
+      ) {
+        void updateJoinRequestStatus(
+          existing?.requestId
+            ? { requestId: existing.requestId, status }
+            : { meetupId, requesterId, status },
+        ).then((ok) => {
+          if (!ok) {
+            console.error(
+              "[meetup-store] updateJoinRequestStatus failed; local state kept",
+            );
+          }
+        });
+      }
     },
-    [],
+    [hostRequesters, userId],
   );
 
-  const hideUser = useCallback((userId: string) => {
+  const hideUser = useCallback((id: string) => {
     setHidden((prev) => ({
       ...prev,
-      userIds: addIdOnce(prev.userIds, userId),
+      userIds: addIdOnce(prev.userIds, id),
     }));
   }, []);
 
@@ -264,6 +480,8 @@ export function MeetupStoreProvider({ children }: { children: ReactNode }) {
   const value = useMemo<MeetupStoreValue>(
     () => ({
       hydrated,
+      loading,
+      remoteMeetups,
       meetupIds,
       connectIds,
       createdMeetups,
@@ -283,9 +501,12 @@ export function MeetupStoreProvider({ children }: { children: ReactNode }) {
       respondToRequester,
       hideUser,
       hideMeetup,
+      refresh,
     }),
     [
       hydrated,
+      loading,
+      remoteMeetups,
       meetupIds,
       connectIds,
       createdMeetups,
@@ -305,6 +526,7 @@ export function MeetupStoreProvider({ children }: { children: ReactNode }) {
       respondToRequester,
       hideUser,
       hideMeetup,
+      refresh,
     ],
   );
 

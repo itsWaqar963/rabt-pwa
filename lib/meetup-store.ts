@@ -37,6 +37,8 @@ export type MeetupRequester = {
   id: string;
   name: string;
   status: JoinRequestStatus;
+  /** Supabase join_requests.id when remote */
+  requestId?: string;
 };
 
 export type HostRequestersState = Record<string, MeetupRequester[]>;
@@ -58,6 +60,8 @@ export type CreatedMeetup = {
   country: string;
   description: string;
   createdAt: string;
+  /** Real auth uuid when persisted remotely; "self" / absent for local-only */
+  hostUserId?: string;
 };
 
 export type CreateMeetupInput = {
@@ -91,11 +95,16 @@ const DEMO_REQUESTER_NAMES = [
   "Omar Farooq",
 ] as const;
 
-function isMeetupCategory(value: unknown): value is MeetupCategory {
+export function isMeetupCategory(value: unknown): value is MeetupCategory {
   return (
     typeof value === "string" &&
     (MEETUP_CATEGORIES as string[]).includes(value)
   );
+}
+
+/** Local-only demo ids (`created-<ts>`); remote rows use uuid. */
+export function isLocalCreatedMeetupId(id: string): boolean {
+  return id.startsWith("created-");
 }
 
 function isJoinRequestStatus(value: unknown): value is JoinRequestStatus {
@@ -249,6 +258,8 @@ export function parseCreatedMeetups(raw: string | null): CreatedMeetup[] {
           description:
             typeof row.description === "string" ? row.description : "",
           createdAt: row.createdAt,
+          hostUserId:
+            typeof row.hostUserId === "string" ? row.hostUserId : undefined,
         },
       ];
     });
@@ -284,6 +295,7 @@ export function formatMeetupWhen(date: string, time: string): string {
 }
 
 export function createdMeetupToHosted(meetup: CreatedMeetup): HostedMeetup {
+  const remote = Boolean(meetup.hostUserId) && !isLocalCreatedMeetupId(meetup.id);
   return {
     id: meetup.id,
     kind: `Physical gathering · ${meetup.category.toLowerCase()}`,
@@ -296,11 +308,18 @@ export function createdMeetupToHosted(meetup: CreatedMeetup): HostedMeetup {
     when: formatMeetupWhen(meetup.date, meetup.time),
     organizerName: "You",
     organizerRole: "Host",
-    hostUserId: "self",
+    hostUserId: meetup.hostUserId ?? "self",
     spotsLeft: meetup.maxSpots,
     city: meetup.city,
     country: meetup.country,
-    source: "created",
+    source: remote ? "remote" : "created",
+    date: meetup.date,
+    time: meetup.time,
+    category: meetup.category,
+    venue: meetup.venue,
+    maxSpots: meetup.maxSpots,
+    descriptionRaw: meetup.description,
+    createdAt: meetup.createdAt,
   };
 }
 
@@ -349,6 +368,8 @@ export function ensureHostRequesters(
   let changed = false;
   const next = { ...existing };
   for (const meetup of createdMeetups) {
+    // Only seed fake IMS requesters for local-only demo meetups
+    if (!isLocalCreatedMeetupId(meetup.id)) continue;
     if (!next[meetup.id] || next[meetup.id]!.length === 0) {
       next[meetup.id] = seedPendingRequesters(meetup.id);
       changed = true;
