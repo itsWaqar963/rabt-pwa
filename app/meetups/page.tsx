@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { AuthGuard } from "@/components/auth/AuthGuard";
 import { BottomNav } from "@/components/layout/BottomNav";
+import { useChatNotify } from "@/components/providers/ChatNotifyProvider";
 import { useMeetupStore } from "@/components/providers/MeetupStoreProvider";
 import { CreateMeetupModal } from "@/components/ui/CreateMeetupModal";
 import { FilterPills } from "@/components/ui/FilterPills";
@@ -77,15 +79,27 @@ function renderMeetupCard(
 }
 
 export default function MeetupsPage() {
+  return (
+    <Suspense fallback={null}>
+      <MeetupsPageContent />
+    </Suspense>
+  );
+}
+
+function MeetupsPageContent() {
   const [activeTab, setActiveTab] = useState<Tab>("explore");
   const [createOpen, setCreateOpen] = useState(false);
   const [filters, setFilters] = useState<DiscoveryFilters>(DEFAULT_FILTERS);
   const { user } = useAuth();
+  const searchParams = useSearchParams();
+  const { requestOpenChat } = useChatNotify();
+  const chatDeepLinkHandled = useRef<string | null>(null);
 
   const {
     createdMeetups,
     remoteMeetups,
     loading,
+    hydrated,
     isMeetupRequested,
     getJoinStatus,
     toggleMeetupRequest,
@@ -126,6 +140,25 @@ export default function MeetupsPage() {
     }
     return [...byId.values()];
   }, [remoteMeetups, createdAsHosted, seedMeetups, isMeetupHidden]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const chatId = searchParams.get("chat")?.trim();
+    if (!chatId) return;
+    if (chatDeepLinkHandled.current === chatId) return;
+    chatDeepLinkHandled.current = chatId;
+    const title =
+      allExplore.find((m) => m.id === chatId)?.title ??
+      createdMeetups.find((m) => m.id === chatId)?.title ??
+      "Meetup chat";
+    requestOpenChat(chatId, title);
+  }, [
+    hydrated,
+    searchParams,
+    allExplore,
+    createdMeetups,
+    requestOpenChat,
+  ]);
 
   const exploreMeetups = useMemo(
     () => filterHostedMeetups(allExplore, filters.country, filters.city),

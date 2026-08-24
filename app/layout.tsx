@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { AuthProvider } from "@/context/AuthContext";
 import { ChatNotifyProvider } from "@/components/providers/ChatNotifyProvider";
 import { MeetupStoreProvider } from "@/components/providers/MeetupStoreProvider";
+import { ServiceWorkerRegister } from "@/components/pwa/ServiceWorkerRegister";
 import { InstallPrompt } from "@/components/ui/InstallPrompt";
 import { OfflineBanner } from "@/components/ui/OfflineBanner";
 import "./globals.css";
@@ -47,6 +48,7 @@ export default function RootLayout({
           <AuthProvider>
             <MeetupStoreProvider>
               <ChatNotifyProvider>
+                <ServiceWorkerRegister />
                 <OfflineBanner />
                 {children}
                 <InstallPrompt />

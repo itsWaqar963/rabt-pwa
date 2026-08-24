@@ -8,9 +8,161 @@ export type ChatMessage = {
   createdAt: string;
   senderName: string;
   senderAvatarUrl?: string;
-  /** Client-only demo ticks — not persisted */
+  /**
+   * Client-only delivery ticks via Realtime Broadcast ACKs.
+   * Offline→online receipts need DB columns later (broadcast only reaches online peers).
+   */
   status?: "sent" | "delivered" | "read";
 };
+
+export type ChatAckKind = "ACK_DELIVERED" | "ACK_READ";
+
+export type ChatAckPayload = {
+  kind: ChatAckKind;
+  meetupId: string;
+  messageId: string;
+  fromUserId: string;
+};
+
+type MessageStatus = NonNullable<ChatMessage["status"]>;
+
+const STATUS_RANK: Record<MessageStatus, number> = {
+  sent: 1,
+  delivered: 2,
+  read: 3,
+};
+
+function ackKindToStatus(kind: ChatAckKind): MessageStatus {
+  switch (kind) {
+    case "ACK_DELIVERED":
+      return "delivered";
+    case "ACK_READ":
+      return "read";
+    default: {
+      const _exhaustive: never = kind;
+      return _exhaustive;
+    }
+  }
+}
+
+/** Upgrade-only: sent → delivered → read. Never downgrade. */
+export function applyAckToMessages(
+  messages: ChatMessage[],
+  messageId: string,
+  kind: ChatAckKind,
+): ChatMessage[] {
+  const nextStatus = ackKindToStatus(kind);
+  return messages.map((m) => {
+    if (m.id !== messageId) return m;
+    const current: MessageStatus = m.status ?? "sent";
+    if (STATUS_RANK[nextStatus] <= STATUS_RANK[current]) return m;
+    return { ...m, status: nextStatus };
+  });
+}
+
+function ackChannelName(meetupId: string): string {
+  return `meetup-acks-${meetupId}`;
+}
+
+export function subscribeChatAcks(
+  meetupId: string,
+  onAck: (payload: ChatAckPayload) => void,
+): () => void {
+  if (!isSupabaseConfigured) return () => {};
+
+  const channel = supabase
+    .channel(ackChannelName(meetupId), {
+      config: { broadcast: { self: false } },
+    })
+    .on("broadcast", { event: "chat_ack" }, ({ payload }) => {
+      const raw = payload as Partial<ChatAckPayload> | null;
+      if (!raw?.kind || !raw.messageId || !raw.meetupId || !raw.fromUserId) {
+        return;
+      }
+      switch (raw.kind) {
+        case "ACK_DELIVERED":
+        case "ACK_READ":
+          onAck({
+            kind: raw.kind,
+            meetupId: raw.meetupId,
+            messageId: raw.messageId,
+            fromUserId: raw.fromUserId,
+          });
+          break;
+        default: {
+          const _exhaustive: never = raw.kind;
+          void _exhaustive;
+        }
+      }
+    })
+    .subscribe();
+
+  return () => {
+    void supabase.removeChannel(channel);
+  };
+}
+
+/**
+ * Broadcast ACK on `meetup-acks-${meetupId}`.
+ * Only reaches online peers subscribed to the same topic.
+ */
+export async function broadcastChatAck(
+  payload: ChatAckPayload,
+): Promise<void> {
+  if (!isSupabaseConfigured) return;
+
+  const topic = ackChannelName(payload.meetupId);
+  const existing = supabase
+    .getChannels()
+    .find((c) => c.topic === `realtime:${topic}` && c.state === "joined");
+
+  try {
+    if (existing) {
+      const result = await existing.send({
+        type: "broadcast",
+        event: "chat_ack",
+        payload,
+      });
+      if (result !== "ok") {
+        logRemoteError("broadcastChatAck.send", result);
+      }
+      return;
+    }
+
+    const channel = supabase.channel(topic, {
+      config: { broadcast: { self: false } },
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(
+        () => reject(new Error("ack channel subscribe timeout")),
+        8000,
+      );
+      channel.subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          clearTimeout(timeout);
+          resolve();
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          clearTimeout(timeout);
+          reject(new Error(status));
+        }
+      });
+    });
+
+    const result = await channel.send({
+      type: "broadcast",
+      event: "chat_ack",
+      payload,
+    });
+    if (result !== "ok") {
+      logRemoteError("broadcastChatAck.send", result);
+    }
+    // Leave channel up so a concurrent subscribeChatAcks can reuse it;
+    // listener cleanup removes via removeChannel.
+  } catch (err) {
+    logRemoteError("broadcastChatAck", err);
+  }
+}
 
 type ProfileEmbed = {
   full_name: string | null;

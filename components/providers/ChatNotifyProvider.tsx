@@ -15,7 +15,7 @@ import { MessageCircle } from "lucide-react";
 import { useMeetupStore } from "@/components/providers/MeetupStoreProvider";
 import { useAuth } from "@/context/AuthContext";
 import { playChatSound } from "@/lib/chat-sounds";
-import { subscribeMessages } from "@/lib/chat-sync";
+import { broadcastChatAck, subscribeMessages } from "@/lib/chat-sync";
 
 type ChatToast = {
   messageId: string;
@@ -94,7 +94,16 @@ function ChatInboxListener({
     const unsubs = eligible.map(({ id, title }) =>
       subscribeMessages(id, (msg) => {
         if (msg.senderId === myId) return;
+        // Modal open for this meetup handles DELIVERED + READ itself
         if (activeRef.current === id) return;
+
+        void broadcastChatAck({
+          kind: "ACK_DELIVERED",
+          meetupId: id,
+          messageId: msg.id,
+          fromUserId: myId,
+        });
+
         onToastRef.current({ messageId: msg.id, meetupId: id, title });
       }),
     );

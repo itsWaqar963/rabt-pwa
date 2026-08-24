@@ -16,8 +16,11 @@ import { useAuth } from "@/context/AuthContext";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { playChatSound } from "@/lib/chat-sounds";
 import {
+  applyAckToMessages,
+  broadcastChatAck,
   fetchMessages,
   sendMessage,
+  subscribeChatAcks,
   subscribeMessages,
   type ChatMessage,
 } from "@/lib/chat-sync";
@@ -106,6 +109,29 @@ function ChatAvatar({
   );
 }
 
+async function ackPeerMessagesRead(
+  meetupId: string,
+  myId: string,
+  messages: ChatMessage[],
+): Promise<void> {
+  const peer = messages.filter((m) => m.senderId !== myId);
+  // Cap flood: ACK_READ for all peer msgs on open (typically short threads)
+  for (const msg of peer) {
+    await broadcastChatAck({
+      kind: "ACK_DELIVERED",
+      meetupId,
+      messageId: msg.id,
+      fromUserId: myId,
+    });
+    await broadcastChatAck({
+      kind: "ACK_READ",
+      meetupId,
+      messageId: msg.id,
+      fromUserId: myId,
+    });
+  }
+}
+
 export function MeetupChatModal({
   open,
   onClose,
@@ -124,51 +150,8 @@ export function MeetupChatModal({
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const tickTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>[]>>(
-    new Map(),
-  );
   const processedInsertsRef = useRef<Set<string>>(new Set());
   const myId = user?.id;
-
-  function clearTickTimers(messageId?: string) {
-    if (messageId) {
-      const timers = tickTimersRef.current.get(messageId);
-      if (timers) {
-        for (const t of timers) clearTimeout(t);
-        tickTimersRef.current.delete(messageId);
-      }
-      return;
-    }
-    for (const timers of tickTimersRef.current.values()) {
-      for (const t of timers) clearTimeout(t);
-    }
-    tickTimersRef.current.clear();
-  }
-
-  function advanceDemoStatus(messageId: string) {
-    clearTickTimers(messageId);
-    const delivered = setTimeout(() => {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === messageId && m.status === "sent"
-            ? { ...m, status: "delivered" }
-            : m,
-        ),
-      );
-    }, 500);
-    const read = setTimeout(() => {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === messageId &&
-          (m.status === "delivered" || m.status === "sent")
-            ? { ...m, status: "read" }
-            : m,
-        ),
-      );
-      tickTimersRef.current.delete(messageId);
-    }, 2000);
-    tickTimersRef.current.set(messageId, [delivered, read]);
-  }
 
   useEffect(() => {
     setShell(
@@ -205,16 +188,24 @@ export function MeetupChatModal({
     let cancelled = false;
     setLoading(true);
     setMessages([]);
-    clearTickTimers();
     processedInsertsRef.current = new Set();
 
     void fetchMessages(meetupId).then((rows) => {
       if (cancelled) return;
-      setMessages(rows);
+      const withOwnSent = myId
+        ? rows.map((m) =>
+            m.senderId === myId && !m.status ? { ...m, status: "sent" as const } : m,
+          )
+        : rows;
+      setMessages(withOwnSent);
       setLoading(false);
+
+      if (myId) {
+        void ackPeerMessagesRead(meetupId, myId, withOwnSent);
+      }
     });
 
-    const unsubscribe = subscribeMessages(meetupId, (msg) => {
+    const unsubMessages = subscribeMessages(meetupId, (msg) => {
       setMessages((prev) => {
         if (prev.some((m) => m.id === msg.id)) return prev;
         if (myId && msg.senderId === myId && !msg.status) {
@@ -227,16 +218,41 @@ export function MeetupChatModal({
       processedInsertsRef.current.add(msg.id);
 
       if (myId && msg.senderId === myId) {
-        if (!msg.status) advanceDemoStatus(msg.id);
-      } else if (msg.senderId !== myId) {
+        return;
+      }
+
+      if (myId && msg.senderId !== myId) {
         playChatSound("pop");
+        void (async () => {
+          await broadcastChatAck({
+            kind: "ACK_DELIVERED",
+            meetupId,
+            messageId: msg.id,
+            fromUserId: myId,
+          });
+          await broadcastChatAck({
+            kind: "ACK_READ",
+            meetupId,
+            messageId: msg.id,
+            fromUserId: myId,
+          });
+        })();
       }
     });
 
+    const unsubAcks = myId
+      ? subscribeChatAcks(meetupId, (ack) => {
+          if (ack.fromUserId === myId) return;
+          setMessages((prev) =>
+            applyAckToMessages(prev, ack.messageId, ack.kind),
+          );
+        })
+      : () => {};
+
     return () => {
       cancelled = true;
-      unsubscribe();
-      clearTickTimers();
+      unsubMessages();
+      unsubAcks();
     };
   }, [open, canChat, meetupId, myId]);
 
@@ -264,7 +280,6 @@ export function MeetupChatModal({
         if (prev.some((m) => m.id === created.id)) return prev;
         return [...prev, { ...created, status: "sent" }];
       });
-      advanceDemoStatus(created.id);
     } else {
       setDraft(body);
     }
