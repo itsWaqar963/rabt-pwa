@@ -1,6 +1,7 @@
 "use client";
 
 import { BottomNav } from "@/components/layout/BottomNav";
+import { LearnEarnSection } from "@/components/ui/LearnEarnSection";
 import { ProfileHeaderButton } from "@/components/ui/ProfileHeaderButton";
 import { ReflectionCard } from "@/components/ui/ReflectionCard";
 
@@ -103,6 +104,8 @@ export default function ReflectPage() {
             </div>
           </div>
         </section>
+
+        <LearnEarnSection />
 
         <section>
           <div className="flex items-end justify-between gap-3 px-0.5 pb-3 pt-[25px]">
