@@ -7,6 +7,7 @@ import { useMeetupStore } from "@/components/providers/MeetupStoreProvider";
 import { CreateMeetupModal } from "@/components/ui/CreateMeetupModal";
 import { FilterPills } from "@/components/ui/FilterPills";
 import { MeetupCard } from "@/components/ui/MeetupCard";
+import { ProfileHeaderButton } from "@/components/ui/ProfileHeaderButton";
 import { useAuth } from "@/context/AuthContext";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import {
@@ -153,6 +154,16 @@ export default function MeetupsPage() {
     [allExplore, getJoinStatus, user?.id],
   );
 
+  const goingMeetups = useMemo(
+    () => joinedMeetups.filter((m) => getJoinStatus(m.id) === "accepted"),
+    [joinedMeetups, getJoinStatus],
+  );
+
+  const awaitingMeetups = useMemo(
+    () => joinedMeetups.filter((m) => getJoinStatus(m.id) === "pending"),
+    [joinedMeetups, getJoinStatus],
+  );
+
   const metaLabel = getFilterMetaLabel(filters);
   const isExplore = activeTab === "explore";
 
@@ -164,7 +175,7 @@ export default function MeetupsPage() {
     <AuthGuard>
     <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_80%_4%,color-mix(in_oklch,var(--muted)_9%,transparent),transparent_20rem),var(--bg)]">
       <main className="relative z-[1] h-[100dvh] overflow-y-auto px-[18px] pb-[max(96px,calc(max(20px,env(safe-area-inset-bottom,0px))+80px))] pt-[max(18px,env(safe-area-inset-top))] [scrollbar-width:none] max-[360px]:px-3.5 [&::-webkit-scrollbar]:hidden">
-        <header className="relative z-10 flex min-h-12 items-center justify-between">
+        <header className="relative z-10 flex min-h-12 items-center justify-between gap-2">
           <div className="flex items-baseline gap-2.5">
             <span
               lang="ar"
@@ -180,21 +191,24 @@ export default function MeetupsPage() {
               RABT
             </span>
           </div>
-          <button
-            type="button"
-            onClick={openCreate}
-            disabled={isOffline}
-            className={`inline-flex min-h-11 items-center gap-[7px] rounded-[11px] border px-3 text-[11px] font-semibold transition-[background,border-color] duration-150 max-[360px]:px-2.5 ${
-              isOffline
-                ? "cursor-not-allowed border-border bg-transparent text-muted opacity-50"
-                : "border-[color-mix(in_oklch,var(--accent)_60%,var(--border))] bg-[color-mix(in_oklch,var(--accent)_14%,transparent)] text-accent hover:bg-[color-mix(in_oklch,var(--accent)_22%,transparent)]"
-            }`}
-          >
-            {!isOffline ? (
-              <span className="text-lg font-normal leading-none">+</span>
-            ) : null}
-            {isOffline ? "Requires Internet" : "Create Meetup"}
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={openCreate}
+              disabled={isOffline}
+              className={`inline-flex min-h-11 items-center gap-[7px] rounded-[11px] border px-3 text-[11px] font-semibold transition-[background,border-color] duration-150 max-[360px]:px-2.5 ${
+                isOffline
+                  ? "cursor-not-allowed border-border bg-transparent text-muted opacity-50"
+                  : "border-[color-mix(in_oklch,var(--accent)_60%,var(--border))] bg-[color-mix(in_oklch,var(--accent)_14%,transparent)] text-accent hover:bg-[color-mix(in_oklch,var(--accent)_22%,transparent)]"
+              }`}
+            >
+              {!isOffline ? (
+                <span className="text-lg font-normal leading-none">+</span>
+              ) : null}
+              {isOffline ? "Requires Internet" : "Create Meetup"}
+            </button>
+            <ProfileHeaderButton />
+          </div>
         </header>
 
         <section className="px-0.5 pb-5 pt-[27px]">
@@ -286,10 +300,13 @@ export default function MeetupsPage() {
                     const isHost =
                       (user?.id && meetup.hostUserId === user.id) ||
                       meetup.source === "created";
+                    const accepted =
+                      getJoinStatus(meetup.id) === "accepted";
                     return renderMeetupCard(meetup, {
                       requested: isMeetupRequested(meetup.id),
                       onRequestToggle: () => toggleMeetupRequest(meetup.id),
                       hideRequest: isHost,
+                      venueLocked: isHost ? false : !accepted,
                       onHide: () => hideMeetup(meetup.id),
                     });
                   })}
@@ -303,7 +320,10 @@ export default function MeetupsPage() {
                   Your calendar
                 </h2>
                 <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted">
-                  {hostedMine.length + joinedMeetups.length} saved
+                  {hostedMine.length +
+                    goingMeetups.length +
+                    awaitingMeetups.length}{" "}
+                  saved
                 </span>
               </div>
 
@@ -335,28 +355,52 @@ export default function MeetupsPage() {
 
                 <section>
                   <h3 className="mb-3 px-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-muted">
-                    Joined / Requested
+                    Going
                   </h3>
-                  {joinedMeetups.length === 0 ? (
+                  {goingMeetups.length === 0 ? (
                     <div className="border border-dashed border-border px-5 py-6 text-center text-xs text-muted">
-                      No join requests yet. Explore a gathering and request a
+                      No accepted meetups yet. When a host accepts you, it
+                      shows here with the venue unlocked.
+                    </div>
+                  ) : (
+                    <div className="grid gap-3">
+                      {goingMeetups.map((meetup) =>
+                        renderMeetupCard(meetup, {
+                          requested: true,
+                          onRequestToggle: () =>
+                            toggleMeetupRequest(meetup.id),
+                          venueLocked: false,
+                          showChatToggle: true,
+                          joinStatus: "accepted",
+                          onHide: () => hideMeetup(meetup.id),
+                        }),
+                      )}
+                    </div>
+                  )}
+                </section>
+
+                <section>
+                  <h3 className="mb-3 px-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-muted">
+                    Awaiting Host Approval
+                  </h3>
+                  {awaitingMeetups.length === 0 ? (
+                    <div className="border border-dashed border-border px-5 py-6 text-center text-xs text-muted">
+                      No pending requests. Explore a gathering and request a
                       spot.
                     </div>
                   ) : (
                     <div className="grid gap-3">
-                      {joinedMeetups.map((meetup) => {
-                        const status = getJoinStatus(meetup.id);
-                        const accepted = status === "accepted";
-                        return renderMeetupCard(meetup, {
+                      {awaitingMeetups.map((meetup) =>
+                        renderMeetupCard(meetup, {
                           requested: true,
                           onRequestToggle: () =>
                             toggleMeetupRequest(meetup.id),
-                          venueLocked: !accepted,
-                          showChatToggle: accepted,
-                          joinStatus: status,
+                          venueLocked: true,
+                          showChatToggle: false,
+                          joinStatus: "pending",
                           onHide: () => hideMeetup(meetup.id),
-                        });
-                      })}
+                        }),
+                      )}
                     </div>
                   )}
                 </section>

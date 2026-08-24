@@ -522,6 +522,7 @@ export async function fetchHostJoinRequests(
         name,
         status: row.status,
         requestId: row.id,
+        avatarUrl: profile?.avatar_url ?? undefined,
       });
       out[row.meetup_id] = list;
     }

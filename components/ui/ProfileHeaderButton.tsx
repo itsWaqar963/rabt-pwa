@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
-import { User } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { initialsFromName } from "@/lib/profile-store";
 
 type ProfileHeaderButtonProps = {
   ariaLabel?: string;
@@ -12,6 +13,9 @@ export function ProfileHeaderButton({
   ariaLabel = "Open your profile",
 }: ProfileHeaderButtonProps) {
   const reducedMotion = useReducedMotion();
+  const { user } = useAuth();
+  const avatarUrl = user?.avatarUrl;
+  const initials = initialsFromName(user?.name ?? "");
 
   return (
     <div className="relative grid size-[52px] shrink-0 place-items-center">
@@ -55,9 +59,23 @@ export function ProfileHeaderButton({
       <Link
         href="/profile"
         aria-label={ariaLabel}
-        className="relative z-10 grid size-11 place-items-center rounded-full border border-border bg-[color-mix(in_oklch,var(--surface)_72%,transparent)] text-foreground transition-[background,border-color,transform] duration-150 hover:border-foreground hover:bg-[color-mix(in_oklch,var(--fg)_6%,transparent)] active:scale-95"
+        className="relative z-10 grid size-11 place-items-center overflow-hidden rounded-full border border-border bg-[color-mix(in_oklch,var(--surface)_72%,transparent)] text-foreground transition-[background,border-color,transform] duration-150 hover:border-foreground hover:bg-[color-mix(in_oklch,var(--fg)_6%,transparent)] active:scale-95"
       >
-        <User className="size-[19px]" strokeWidth={1.6} aria-hidden />
+        {avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- remote OAuth avatar
+          <img
+            src={avatarUrl}
+            alt=""
+            className="size-full object-cover rounded-full"
+          />
+        ) : (
+          <span
+            aria-hidden
+            className="grid size-full place-items-center bg-[color-mix(in_oklch,var(--accent)_16%,transparent)] font-display text-[13px] font-semibold leading-none text-accent"
+          >
+            {initials}
+          </span>
+        )}
       </Link>
     </div>
   );

@@ -51,7 +51,7 @@ import {
   insertMeetup,
   updateJoinRequestStatus,
 } from "@/lib/meetup-sync";
-import { isSupabaseConfigured } from "@/lib/supabase";
+import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 type MeetupStoreValue = {
   hydrated: boolean;
@@ -195,6 +195,38 @@ export function MeetupStoreProvider({ children }: { children: ReactNode }) {
     };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
+  }, [hydrated, userId, refresh]);
+
+  // Supabase Dashboard → Database → Replication must enable `meetups` + `join_requests` for realtime.
+  useEffect(() => {
+    if (!hydrated || !canUseRemote(userId)) return;
+
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const scheduleRefresh = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        void refresh();
+      }, 300);
+    };
+
+    const channel = supabase
+      .channel("rabt-meetups")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "meetups" },
+        scheduleRefresh,
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "join_requests" },
+        scheduleRefresh,
+      )
+      .subscribe();
+
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      void supabase.removeChannel(channel);
+    };
   }, [hydrated, userId, refresh]);
 
   useEffect(() => {

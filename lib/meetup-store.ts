@@ -39,6 +39,8 @@ export type MeetupRequester = {
   status: JoinRequestStatus;
   /** Supabase join_requests.id when remote */
   requestId?: string;
+  /** Profile photo when available from remote profiles */
+  avatarUrl?: string;
 };
 
 export type HostRequestersState = Record<string, MeetupRequester[]>;

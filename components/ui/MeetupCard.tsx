@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Calendar, MapPin, MessageCircle } from "lucide-react";
 import type { JoinRequestStatus, MeetupRequester } from "@/lib/meetup-store";
 import { joinStatusLabel } from "@/lib/meetup-store";
+import { initialsFromName } from "@/lib/profile-store";
 
 export type MeetupCardProps = {
   kind: string;
@@ -31,6 +32,35 @@ export type MeetupCardProps = {
     status: "accepted" | "declined",
   ) => void;
 };
+
+function RequesterAvatar({
+  name,
+  avatarUrl,
+}: {
+  name: string;
+  avatarUrl?: string;
+}) {
+  const initials = initialsFromName(name);
+  return (
+    <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-full border border-[color-mix(in_oklch,var(--accent)_35%,var(--border))] bg-[color-mix(in_oklch,var(--accent)_14%,transparent)]">
+      {avatarUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element -- remote profile avatar
+        <img
+          src={avatarUrl}
+          alt=""
+          className="size-full object-cover rounded-full"
+        />
+      ) : (
+        <span
+          aria-hidden
+          className="font-display text-[11px] font-semibold leading-none text-accent"
+        >
+          {initials}
+        </span>
+      )}
+    </span>
+  );
+}
 
 export function MeetupCard({
   kind,
@@ -153,13 +183,19 @@ export function MeetupCard({
                 key={requester.id}
                 className="flex flex-wrap items-center justify-between gap-2"
               >
-                <div>
-                  <p className="text-[12px] font-semibold text-foreground">
-                    {requester.name}
-                  </p>
-                  <p className="font-mono text-[8px] uppercase tracking-[0.06em] text-accent">
-                    IMS student · pending
-                  </p>
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <RequesterAvatar
+                    name={requester.name}
+                    avatarUrl={requester.avatarUrl}
+                  />
+                  <div className="min-w-0">
+                    <p className="truncate text-[12px] font-semibold text-foreground">
+                      {requester.name}
+                    </p>
+                    <p className="font-mono text-[8px] uppercase tracking-[0.06em] text-accent">
+                      Pending
+                    </p>
+                  </div>
                 </div>
                 <div className="flex gap-1.5">
                   <button
@@ -188,8 +224,16 @@ export function MeetupCard({
                 key={requester.id}
                 className="flex items-center justify-between gap-2 text-[11px]"
               >
-                <span className="text-foreground">{requester.name}</span>
-                <span className="font-mono text-[8px] uppercase tracking-[0.06em] text-muted">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <RequesterAvatar
+                    name={requester.name}
+                    avatarUrl={requester.avatarUrl}
+                  />
+                  <span className="truncate text-foreground">
+                    {requester.name}
+                  </span>
+                </div>
+                <span className="shrink-0 font-mono text-[8px] uppercase tracking-[0.06em] text-muted">
                   {joinStatusLabel(requester.status)}
                 </span>
               </li>
