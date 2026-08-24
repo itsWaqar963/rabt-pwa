@@ -1,6 +1,12 @@
 -- Meetup group chat: hosts + accepted attendees.
 -- IMPORTANT: enable Realtime replication for `messages` in Dashboard
 -- (Database → Replication → supabase_realtime → add `messages`).
+--
+-- Background Web Push (when sender client notify fails / multi-device):
+-- Dashboard → Database → Webhooks → Create hook on `public.messages` INSERT
+-- → URL: https://<NEXT_PUBLIC_APP_URL>/api/hooks/message-inserted
+-- → HTTP Header: Authorization: Bearer <PUSH_WEBHOOK_SECRET>
+-- (or header x-rabt-webhook-secret: <PUSH_WEBHOOK_SECRET>)
 
 create table if not exists public.messages (
   id uuid primary key default gen_random_uuid(),

@@ -9,7 +9,9 @@ import {
   useRef,
   useState,
   type ReactNode,
+  type SyntheticEvent,
 } from "react";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { MessageCircle } from "lucide-react";
 import { useMeetupStore } from "@/components/providers/MeetupStoreProvider";
@@ -128,6 +130,27 @@ function ChatToastBanner({
   onDismiss: () => void;
 }) {
   const reducedMotion = useReducedMotion();
+  const router = useRouter();
+  const openedForRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    openedForRef.current = null;
+  }, [toast?.messageId]);
+
+  const handleOpen = useCallback(
+    (event: SyntheticEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!toast) return;
+      if (openedForRef.current === toast.messageId) return;
+      openedForRef.current = toast.messageId;
+
+      onDismiss();
+      onOpen(toast.meetupId, toast.title);
+      router.push(`/meetups?chat=${encodeURIComponent(toast.meetupId)}`);
+    },
+    [toast, onDismiss, onOpen, router],
+  );
 
   return (
     <AnimatePresence>
@@ -142,10 +165,8 @@ function ChatToastBanner({
         >
           <button
             type="button"
-            onClick={() => {
-              onOpen(toast.meetupId, toast.title);
-              onDismiss();
-            }}
+            onPointerUp={handleOpen}
+            onClick={handleOpen}
             className="pointer-events-auto flex w-full max-w-[calc(28rem-24px)] cursor-pointer items-center gap-2.5 rounded-[11px] border border-[color-mix(in_oklch,var(--accent)_50%,var(--border))] bg-[color-mix(in_oklch,oklch(0.2_0.03_165)_90%,var(--surface))] px-3.5 py-2.5 text-left shadow-[0_0_0_1px_color-mix(in_oklch,var(--accent)_18%,transparent),0_0_28px_color-mix(in_oklch,var(--accent)_22%,transparent),0_8px_24px_color-mix(in_oklch,var(--bg)_75%,transparent)] backdrop-blur-md transition-[transform,opacity] duration-150 hover:opacity-95 active:scale-[0.99]"
           >
             <MessageCircle
@@ -161,6 +182,50 @@ function ChatToastBanner({
       ) : null}
     </AnimatePresence>
   );
+}
+
+function ServiceWorkerChatBridge({
+  requestOpenChat,
+}: {
+  requestOpenChat: (meetupId: string, title: string) => void;
+}) {
+  const router = useRouter();
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!("serviceWorker" in navigator)) return;
+
+    const onMessage = (event: MessageEvent) => {
+      const data = event.data as {
+        type?: string;
+        meetupId?: string;
+        title?: string;
+        url?: string;
+      } | null;
+      if (!data || data.type !== "RABT_OPEN_CHAT") return;
+      const meetupId =
+        typeof data.meetupId === "string" ? data.meetupId.trim() : "";
+      if (!meetupId) return;
+      requestOpenChat(meetupId, data.title?.trim() || "Meetup");
+      const target =
+        typeof data.url === "string" && data.url.trim()
+          ? data.url
+          : `/meetups?chat=${encodeURIComponent(meetupId)}`;
+      try {
+        const asUrl = new URL(target, window.location.origin);
+        router.push(`${asUrl.pathname}${asUrl.search}`);
+      } catch {
+        router.push(`/meetups?chat=${encodeURIComponent(meetupId)}`);
+      }
+    };
+
+    navigator.serviceWorker.addEventListener("message", onMessage);
+    return () => {
+      navigator.serviceWorker.removeEventListener("message", onMessage);
+    };
+  }, [requestOpenChat, router]);
+
+  return null;
 }
 
 export function ChatNotifyProvider({ children }: { children: ReactNode }) {
@@ -186,11 +251,11 @@ export function ChatNotifyProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const dismissToast = useCallback(() => {
-    setToast(null);
     if (dismissTimerRef.current) {
       clearTimeout(dismissTimerRef.current);
       dismissTimerRef.current = null;
     }
+    setToast(null);
   }, []);
 
   const showToast = useCallback((next: ChatToast) => {
@@ -239,6 +304,7 @@ export function ChatNotifyProvider({ children }: { children: ReactNode }) {
         activeChatMeetupId={activeChatMeetupId}
         onToast={showToast}
       />
+      <ServiceWorkerChatBridge requestOpenChat={requestOpenChat} />
       <ChatToastBanner
         toast={toast}
         onOpen={requestOpenChat}

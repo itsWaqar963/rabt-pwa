@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { absoluteMeetupChatUrl, ensureAbsoluteUrl } from "@/lib/app-url";
 import { getUserFromBearer } from "@/lib/auth-api";
-import { getSupabaseAdmin, isSupabaseAdminConfigured } from "@/lib/supabase-admin";
-import {
-  getPushErrorStatus,
-  isWebPushConfigured,
-  sendPushToSubscription,
-  type PushSubscriptionJSON,
-} from "@/lib/web-push-server";
+import { sendPushToUser } from "@/lib/meetup-push-notify";
+import { isSupabaseAdminConfigured } from "@/lib/supabase-admin";
+import { isWebPushConfigured } from "@/lib/web-push-server";
 
 type SendPushBody = {
   userId?: string;
@@ -15,40 +12,6 @@ type SendPushBody = {
   url?: string;
   meetupId?: string;
 };
-
-async function sendToUserSubscriptions(
-  userId: string,
-  payload: { title: string; body: string; url?: string; meetupId?: string },
-): Promise<{ sent: number; failed: number }> {
-  const admin = getSupabaseAdmin();
-  const { data: rows, error } = await admin
-    .from("push_subscriptions")
-    .select("id, endpoint, subscription_json")
-    .eq("user_id", userId);
-
-  if (error || !rows?.length) {
-    return { sent: 0, failed: 0 };
-  }
-
-  let sent = 0;
-  let failed = 0;
-
-  for (const row of rows) {
-    const sub = row.subscription_json as PushSubscriptionJSON;
-    try {
-      await sendPushToSubscription(sub, payload);
-      sent += 1;
-    } catch (err) {
-      failed += 1;
-      const status = getPushErrorStatus(err);
-      if (status === 404 || status === 410) {
-        await admin.from("push_subscriptions").delete().eq("id", row.id);
-      }
-    }
-  }
-
-  return { sent, failed };
-}
 
 /**
  * POST /api/send-push
@@ -90,11 +53,18 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const result = await sendToUserSubscriptions(userId, {
+  const meetupId = body.meetupId?.trim();
+  const url = meetupId
+    ? body.url?.trim()
+      ? ensureAbsoluteUrl(body.url, req)
+      : absoluteMeetupChatUrl(meetupId, req)
+    : ensureAbsoluteUrl(body.url, req);
+
+  const result = await sendPushToUser(userId, {
     title,
     body: text,
-    url: body.url,
-    meetupId: body.meetupId,
+    url,
+    meetupId,
   });
 
   return NextResponse.json(result);

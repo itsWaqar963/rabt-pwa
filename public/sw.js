@@ -1,5 +1,12 @@
 /* RABT PWA service worker — Web Push + notification deep-link foundation */
 
+function toAbsoluteUrl(url) {
+  if (!url) return self.location.origin + "/meetups";
+  if (/^https?:\/\//i.test(url)) return url;
+  const path = url.startsWith("/") ? url : "/" + url;
+  return self.location.origin + path;
+}
+
 self.addEventListener("install", (event) => {
   self.skipWaiting();
   event.waitUntil(Promise.resolve());
@@ -30,9 +37,10 @@ self.addEventListener("push", (event) => {
     }
   }
 
-  const url =
+  const relativeOrAbs =
     data.url ||
-    (data.meetupId ? `/meetups?chat=${encodeURIComponent(data.meetupId)}` : "/meetups");
+    (data.meetupId ? "/meetups?chat=" + encodeURIComponent(data.meetupId) : "/meetups");
+  const url = toAbsoluteUrl(relativeOrAbs);
 
   event.waitUntil(
     self.registration.showNotification(data.title, {
@@ -48,35 +56,59 @@ self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
   const payload = event.notification.data || {};
-  const targetUrl =
+  const targetRaw =
     payload.url ||
     (payload.meetupId
-      ? `/meetups?chat=${encodeURIComponent(payload.meetupId)}`
+      ? "/meetups?chat=" + encodeURIComponent(payload.meetupId)
       : "/meetups");
+  const absoluteUrl = toAbsoluteUrl(targetRaw);
+
+  let meetupId = payload.meetupId;
+  if (!meetupId) {
+    try {
+      meetupId = new URL(absoluteUrl).searchParams.get("chat") || undefined;
+    } catch {
+      meetupId = undefined;
+    }
+  }
 
   event.waitUntil(
     (async () => {
+      const origin = self.location.origin;
       const allClients = await self.clients.matchAll({
         type: "window",
         includeUncontrolled: true,
       });
 
       for (const client of allClients) {
-        if ("focus" in client) {
-          await client.focus();
-          if ("navigate" in client && typeof client.navigate === "function") {
-            try {
-              await client.navigate(targetUrl);
-            } catch {
-              /* navigate may fail on older browsers */
-            }
-          }
-          return;
+        const clientUrl = client.url || "";
+        if (!clientUrl.startsWith(origin)) continue;
+        if (!("focus" in client)) continue;
+
+        await client.focus();
+        try {
+          client.postMessage({
+            type: "RABT_OPEN_CHAT",
+            meetupId: meetupId || undefined,
+            url: absoluteUrl,
+            title: "Meetup",
+          });
+        } catch {
+          /* postMessage may fail on some clients */
         }
+
+        if ("navigate" in client && typeof client.navigate === "function") {
+          try {
+            await client.navigate(absoluteUrl);
+          } catch {
+            /* navigate may fail on older browsers */
+          }
+        }
+        return;
       }
 
       if (self.clients.openWindow) {
-        await self.clients.openWindow(targetUrl);
+        await self.clients.openWindow(absoluteUrl);
       }
     })(),
   );

@@ -97,10 +97,20 @@ export async function notifyMeetupMessagePush(opts: {
         body: opts.body,
         url: opts.url ?? `/meetups?chat=${encodeURIComponent(opts.meetupId)}`,
       }),
-    }).catch(() => {
-      /* fire-and-forget */
-    });
-  } catch {
-    /* soft-fail */
+    })
+      .then((res) => {
+        if (!res.ok && process.env.NODE_ENV === "development") {
+          console.info("[push] notify soft-fail", res.status);
+        }
+      })
+      .catch((err) => {
+        if (process.env.NODE_ENV === "development") {
+          console.info("[push] notify soft-fail", err);
+        }
+      });
+  } catch (err) {
+    if (process.env.NODE_ENV === "development") {
+      console.info("[push] notify soft-fail", err);
+    }
   }
 }

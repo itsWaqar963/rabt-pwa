@@ -1,9 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Calendar, MapPin, MessageCircle } from "lucide-react";
 import { useChatNotify } from "@/components/providers/ChatNotifyProvider";
-import { MeetupChatModal } from "@/components/ui/MeetupChatModal";
 import type { JoinRequestStatus, MeetupRequester } from "@/lib/meetup-store";
 import { joinStatusLabel } from "@/lib/meetup-store";
 import { initialsFromName } from "@/lib/profile-store";
@@ -120,15 +118,7 @@ export function MeetupCard({
   requesters,
   onRespondRequester,
 }: MeetupCardProps) {
-  const [chatOpen, setChatOpen] = useState(false);
-  const { pendingOpenChat, clearPendingOpenChat } = useChatNotify();
-
-  useEffect(() => {
-    if (pendingOpenChat?.meetupId !== meetupId) return;
-    if (!showChatToggle) return;
-    setChatOpen(true);
-    clearPendingOpenChat();
-  }, [pendingOpenChat, meetupId, showChatToggle, clearPendingOpenChat]);
+  const { requestOpenChat } = useChatNotify();
 
   const statusLabel =
     spotsLeft !== undefined ? `${spotsLeft} spots left` : status;
@@ -203,19 +193,12 @@ export function MeetupCard({
         <div className="mt-3">
           <button
             type="button"
-            onClick={() => setChatOpen(true)}
+            onClick={() => requestOpenChat(meetupId, title)}
             className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-[11px] border border-[color-mix(in_oklch,var(--accent)_45%,var(--border))] bg-[color-mix(in_oklch,var(--accent)_10%,transparent)] px-3 text-[11px] font-semibold text-accent transition-[background] duration-150 hover:bg-[color-mix(in_oklch,var(--accent)_18%,transparent)]"
           >
             <MessageCircle className="size-3.5" strokeWidth={1.8} aria-hidden />
             Open meetup chat
           </button>
-          <MeetupChatModal
-            open={chatOpen}
-            onClose={() => setChatOpen(false)}
-            meetupId={meetupId}
-            meetupTitle={title}
-            canChat={showChatToggle}
-          />
         </div>
       ) : null}
 

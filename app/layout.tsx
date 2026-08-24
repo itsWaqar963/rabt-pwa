@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { AuthProvider } from "@/context/AuthContext";
 import { ChatNotifyProvider } from "@/components/providers/ChatNotifyProvider";
+import { GlobalMeetupChatHost } from "@/components/providers/GlobalMeetupChatHost";
 import { MeetupStoreProvider } from "@/components/providers/MeetupStoreProvider";
 import { ServiceWorkerRegister } from "@/components/pwa/ServiceWorkerRegister";
 import { InstallPrompt } from "@/components/ui/InstallPrompt";
@@ -51,6 +52,7 @@ export default function RootLayout({
                 <ServiceWorkerRegister />
                 <OfflineBanner />
                 {children}
+                <GlobalMeetupChatHost />
                 <InstallPrompt />
               </ChatNotifyProvider>
             </MeetupStoreProvider>
