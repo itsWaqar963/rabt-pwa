@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { AuthProvider } from "@/context/AuthContext";
 import { MeetupStoreProvider } from "@/components/providers/MeetupStoreProvider";
 import { InstallPrompt } from "@/components/ui/InstallPrompt";
 import { OfflineBanner } from "@/components/ui/OfflineBanner";
@@ -34,11 +35,13 @@ export default function RootLayout({
     <html lang="en" className="font-body">
       <body className="bg-background text-foreground font-body antialiased">
         <div className="max-w-md mx-auto min-h-screen relative overflow-hidden bg-background text-foreground">
-          <MeetupStoreProvider>
-            <OfflineBanner />
-            {children}
-            <InstallPrompt />
-          </MeetupStoreProvider>
+          <AuthProvider>
+            <MeetupStoreProvider>
+              <OfflineBanner />
+              {children}
+              <InstallPrompt />
+            </MeetupStoreProvider>
+          </AuthProvider>
         </div>
       </body>
     </html>

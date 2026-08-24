@@ -1,5 +1,6 @@
 "use client";
 
+import { AuthGuard } from "@/components/auth/AuthGuard";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { LearnEarnSection } from "@/components/ui/LearnEarnSection";
 import { ProfileHeaderButton } from "@/components/ui/ProfileHeaderButton";
@@ -26,6 +27,7 @@ const REVIEWS = [
 
 export default function ReflectPage() {
   return (
+    <AuthGuard>
     <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_80%_4%,color-mix(in_oklch,var(--muted)_9%,transparent),transparent_20rem),var(--bg)]">
       <main className="relative z-[1] h-[100dvh] overflow-y-auto px-[18px] pb-[max(96px,calc(max(20px,env(safe-area-inset-bottom,0px))+80px))] pt-[max(18px,env(safe-area-inset-top))] [scrollbar-width:none] max-[360px]:px-3.5 [&::-webkit-scrollbar]:hidden">
         <header className="relative z-10 flex min-h-12 items-center justify-between">
@@ -131,5 +133,6 @@ export default function ReflectPage() {
 
       <BottomNav />
     </div>
+    </AuthGuard>
   );
 }

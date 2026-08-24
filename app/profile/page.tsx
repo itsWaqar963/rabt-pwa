@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
+import { AuthGuard } from "@/components/auth/AuthGuard";
 import { Pencil, Settings } from "lucide-react";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { DigitalTrailRow } from "@/components/ui/DigitalTrailIcons";
@@ -66,6 +67,7 @@ export default function ProfilePage() {
   }
 
   return (
+    <AuthGuard>
     <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_80%_4%,color-mix(in_oklch,var(--muted)_9%,transparent),transparent_20rem),var(--bg)]">
       <main className="relative z-[1] h-[100dvh] overflow-y-auto px-[18px] pb-[max(96px,calc(max(20px,env(safe-area-inset-bottom,0px))+80px))] pt-[max(18px,env(safe-area-inset-top))] [scrollbar-width:none] max-[360px]:px-3.5 [&::-webkit-scrollbar]:hidden">
         <header className="relative z-10 flex min-h-12 items-center justify-between">
@@ -381,5 +383,6 @@ export default function ProfilePage() {
 
       <BottomNav />
     </div>
+    </AuthGuard>
   );
 }

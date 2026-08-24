@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { AuthGuard } from "@/components/auth/AuthGuard";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { useMeetupStore } from "@/components/providers/MeetupStoreProvider";
 import { BackToTopFab } from "@/components/ui/BackToTopFab";
@@ -74,6 +75,7 @@ export default function DiscoverPage() {
   const selectedUser = findDiscoveryUser(DISCOVERY_USERS, selectedUserId);
 
   return (
+    <AuthGuard>
     <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_80%_4%,color-mix(in_oklch,var(--muted)_9%,transparent),transparent_20rem),var(--bg)]">
       <main
         ref={mainRef}
@@ -190,5 +192,6 @@ export default function DiscoverPage() {
         }
       />
     </div>
+    </AuthGuard>
   );
 }
