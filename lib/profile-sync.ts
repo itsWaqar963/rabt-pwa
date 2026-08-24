@@ -4,7 +4,11 @@ import {
   trimSocialUrls,
   type SocialUrls,
 } from "@/lib/social-links";
-import type { ProfileData } from "@/lib/profile-store";
+import {
+  parseProfileAgeGroup,
+  parseProfileGender,
+  type ProfileData,
+} from "@/lib/profile-store";
 
 export type AuthProfileUser = {
   id: string;
@@ -24,11 +28,15 @@ export type ProfileRow = {
   introvert_extrovert: number | null;
   subline: string | null;
   is_ims_student: boolean | null;
+  gender: string | null;
+  age_group: string | null;
+  city: string | null;
+  country: string | null;
   updated_at: string | null;
 };
 
 const PROFILE_COLUMNS =
-  "id, full_name, email, avatar_url, active_intent, skills, social_urls, introvert_extrovert, subline, is_ims_student, updated_at";
+  "id, full_name, email, avatar_url, active_intent, skills, social_urls, introvert_extrovert, subline, is_ims_student, gender, age_group, city, country, updated_at";
 
 function clampScore(score: number): number {
   return Math.min(10, Math.max(1, Math.round(score)));
@@ -67,6 +75,16 @@ export function mergeRemoteEditable(
       typeof row.is_ims_student === "boolean"
         ? row.is_ims_student
         : local.isImsStudent,
+    gender:
+      typeof row.gender === "string"
+        ? parseProfileGender(row.gender)
+        : local.gender,
+    ageGroup:
+      typeof row.age_group === "string"
+        ? parseProfileAgeGroup(row.age_group)
+        : local.ageGroup,
+    city: typeof row.city === "string" ? row.city : local.city,
+    country: typeof row.country === "string" ? row.country : local.country,
   };
 }
 
@@ -126,6 +144,10 @@ export async function saveProfileRemote(
       introvert_extrovert: clampScore(profile.introvertExtrovert),
       subline: profile.subline,
       is_ims_student: profile.isImsStudent,
+      gender: profile.gender,
+      age_group: profile.ageGroup,
+      city: profile.city,
+      country: profile.country,
       updated_at: new Date().toISOString(),
     };
     if (identity?.email !== undefined) payload.email = identity.email ?? null;

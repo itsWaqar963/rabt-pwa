@@ -1,3 +1,4 @@
+import { getFilterLabel } from "@/lib/discovery-filters";
 import {
   EMPTY_SOCIAL_URLS,
   normalizeSocialUrls,
@@ -9,6 +10,9 @@ export const PROFILE_KEY = "rabt_profile";
 
 export type { SocialUrls };
 
+export type ProfileGender = "" | "man" | "woman" | "prefer-not";
+export type ProfileAgeGroup = "" | "18-22" | "23-27" | "28-32" | "33+";
+
 export type ProfileData = {
   name: string;
   initial: string;
@@ -18,6 +22,10 @@ export type ProfileData = {
   skills: string[];
   socialUrls: SocialUrls;
   introvertExtrovert: number;
+  gender: ProfileGender;
+  ageGroup: ProfileAgeGroup;
+  city: string;
+  country: string;
 };
 
 export const DEFAULT_PROFILE: ProfileData = {
@@ -29,7 +37,103 @@ export const DEFAULT_PROFILE: ProfileData = {
   skills: [],
   socialUrls: { ...EMPTY_SOCIAL_URLS },
   introvertExtrovert: 5,
+  gender: "",
+  ageGroup: "",
+  city: "",
+  country: "",
 };
+
+export const PROFILE_GENDER_OPTIONS: { value: ProfileGender; label: string }[] =
+  [
+    { value: "man", label: "Man" },
+    { value: "woman", label: "Woman" },
+    { value: "prefer-not", label: "Prefer not to say" },
+  ];
+
+export const PROFILE_AGE_GROUP_OPTIONS: {
+  value: ProfileAgeGroup;
+  label: string;
+}[] = [
+  { value: "18-22", label: "18–22" },
+  { value: "23-27", label: "23–27" },
+  { value: "28-32", label: "28–32" },
+  { value: "33+", label: "33+" },
+];
+
+const UNSET_LABEL = "—";
+
+export function parseProfileGender(raw: unknown): ProfileGender {
+  if (raw === "man" || raw === "woman" || raw === "prefer-not") return raw;
+  return "";
+}
+
+export function parseProfileAgeGroup(raw: unknown): ProfileAgeGroup {
+  if (
+    raw === "18-22" ||
+    raw === "23-27" ||
+    raw === "28-32" ||
+    raw === "33+"
+  ) {
+    return raw;
+  }
+  return "";
+}
+
+export function profileGenderLabel(gender: ProfileGender): string {
+  switch (gender) {
+    case "man":
+      return "Man";
+    case "woman":
+      return "Woman";
+    case "prefer-not":
+      return "Prefer not to say";
+    case "":
+      return UNSET_LABEL;
+    default: {
+      const _exhaustive: never = gender;
+      return _exhaustive;
+    }
+  }
+}
+
+export function profileAgeGroupLabel(ageGroup: ProfileAgeGroup): string {
+  switch (ageGroup) {
+    case "18-22":
+      return "18–22";
+    case "23-27":
+      return "23–27";
+    case "28-32":
+      return "28–32";
+    case "33+":
+      return "33+";
+    case "":
+      return UNSET_LABEL;
+    default: {
+      const _exhaustive: never = ageGroup;
+      return _exhaustive;
+    }
+  }
+}
+
+export function profilePlaceLabel(
+  key: "city" | "country",
+  value: string,
+): string {
+  if (!value) return UNSET_LABEL;
+  return getFilterLabel(key, value);
+}
+
+export function clusterSignalItems(profile: ProfileData): {
+  label: string;
+  value: string;
+}[] {
+  return [
+    { label: "City", value: profilePlaceLabel("city", profile.city) },
+    { label: "Country", value: profilePlaceLabel("country", profile.country) },
+    { label: "Gender", value: profileGenderLabel(profile.gender) },
+    { label: "Age group", value: profileAgeGroupLabel(profile.ageGroup) },
+  ];
+}
 
 const DUMMY_PROFILE_NAME = "Sana Khalid";
 const LATIN_LETTER = /[A-Za-z]/;
@@ -119,6 +223,13 @@ function parseProfile(raw: string | null): ProfileData {
         typeof row.introvertExtrovert === "number"
           ? clampScore(row.introvertExtrovert)
           : DEFAULT_PROFILE.introvertExtrovert,
+      gender: parseProfileGender(row.gender),
+      ageGroup: parseProfileAgeGroup(row.ageGroup),
+      city: typeof row.city === "string" ? row.city : DEFAULT_PROFILE.city,
+      country:
+        typeof row.country === "string"
+          ? row.country
+          : DEFAULT_PROFILE.country,
     };
   } catch {
     return { ...DEFAULT_PROFILE };

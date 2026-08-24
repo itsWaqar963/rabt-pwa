@@ -10,11 +10,25 @@ import {
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { X } from "lucide-react";
-import { meetupFieldClass } from "@/components/ui/DarkSelectPopover";
+import {
+  DarkSelectPopover,
+  meetupFieldClass,
+} from "@/components/ui/DarkSelectPopover";
 import { SocialPlatformIcon } from "@/components/ui/SocialPlatformIcons";
 import {
+  FILTER_OPTIONS,
+  getCityOptions,
+  getFilterLabel,
+} from "@/lib/discovery-filters";
+import {
+  parseProfileAgeGroup,
+  parseProfileGender,
   parseSkillsInput,
+  PROFILE_AGE_GROUP_OPTIONS,
+  PROFILE_GENDER_OPTIONS,
+  type ProfileAgeGroup,
   type ProfileData,
+  type ProfileGender,
 } from "@/lib/profile-store";
 import {
   SOCIAL_PLATFORMS,
@@ -37,7 +51,13 @@ type FormState = {
   skillInput: string;
   socialUrls: SocialUrls;
   introvertExtrovert: number;
+  gender: ProfileGender;
+  ageGroup: ProfileAgeGroup;
+  city: string;
+  country: string;
 };
+
+type ClusterPopover = "country" | "city" | "gender" | "age" | null;
 
 function toFormState(profile: ProfileData): FormState {
   return {
@@ -46,6 +66,10 @@ function toFormState(profile: ProfileData): FormState {
     skillInput: "",
     socialUrls: normalizeSocialUrls(profile.socialUrls),
     introvertExtrovert: profile.introvertExtrovert,
+    gender: profile.gender,
+    ageGroup: profile.ageGroup,
+    city: profile.city,
+    country: profile.country,
   };
 }
 
@@ -59,6 +83,7 @@ export function EditProfileModal({
   const reducedMotion = useReducedMotion();
   const [shell, setShell] = useState<HTMLElement | null>(null);
   const [form, setForm] = useState<FormState>(() => toFormState(profile));
+  const [openPopover, setOpenPopover] = useState<ClusterPopover>(null);
 
   useEffect(() => {
     setShell(
@@ -69,6 +94,7 @@ export function EditProfileModal({
   useEffect(() => {
     if (!open) return;
     setForm(toFormState(profile));
+    setOpenPopover(null);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
@@ -79,11 +105,16 @@ export function EditProfileModal({
   useEffect(() => {
     if (!open) return;
     function onKey(event: globalThis.KeyboardEvent) {
-      if (event.key === "Escape") onClose();
+      if (event.key !== "Escape") return;
+      if (openPopover) {
+        setOpenPopover(null);
+        return;
+      }
+      onClose();
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  }, [open, onClose, openPopover]);
 
   function addSkill(raw: string) {
     const next = parseSkillsInput(raw);
@@ -117,8 +148,31 @@ export function EditProfileModal({
       skills: form.skills,
       socialUrls: trimSocialUrls(form.socialUrls),
       introvertExtrovert: form.introvertExtrovert,
+      gender: form.gender,
+      ageGroup: form.ageGroup,
+      city: form.city,
+      country: form.country,
     });
     onClose();
+  }
+
+  const countryOptions = FILTER_OPTIONS.country.filter(
+    (opt) => opt.value !== "all",
+  );
+  const cityOptions = getCityOptions(form.country).filter(
+    (opt) => opt.value !== "all",
+  );
+
+  function setCountry(value: string) {
+    setForm((prev) => {
+      const cities = getCityOptions(value).filter((opt) => opt.value !== "all");
+      const cityOk = cities.some((c) => c.value === prev.city);
+      return {
+        ...prev,
+        country: value,
+        city: cityOk ? prev.city : "",
+      };
+    });
   }
 
   if (!shell) return null;
@@ -180,7 +234,7 @@ export function EditProfileModal({
               </button>
             </div>
 
-            <div className="mt-5 min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-visible px-[22px] [scrollbar-width:thin]">
+            <div className="mt-5 min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-visible px-[22px] pb-8 [scrollbar-width:thin]">
               <label className="block">
                 <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.08em] text-muted">
                   Active intent
@@ -201,6 +255,102 @@ export function EditProfileModal({
                   Use | between intents to match the rotating marquee.
                 </span>
               </label>
+
+              <div>
+                <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.08em] text-muted">
+                  Cluster signals
+                </span>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <span className="mb-1.5 block font-mono text-[9px] uppercase tracking-[0.07em] text-muted">
+                      Country
+                    </span>
+                    <DarkSelectPopover
+                      id="profile-country"
+                      label="Country"
+                      value={form.country}
+                      options={countryOptions.map((opt) => ({
+                        value: opt.value,
+                        label: opt.label,
+                      }))}
+                      open={openPopover === "country"}
+                      onOpenChange={(next) =>
+                        setOpenPopover(next ? "country" : null)
+                      }
+                      onChange={setCountry}
+                    />
+                  </div>
+                  <div>
+                    <span className="mb-1.5 block font-mono text-[9px] uppercase tracking-[0.07em] text-muted">
+                      City
+                    </span>
+                    <DarkSelectPopover
+                      id="profile-city"
+                      label="City"
+                      value={form.city}
+                      options={cityOptions.map((opt) => ({
+                        value: opt.value,
+                        label: getFilterLabel("city", opt.value),
+                      }))}
+                      open={openPopover === "city"}
+                      onOpenChange={(next) =>
+                        setOpenPopover(next ? "city" : null)
+                      }
+                      onChange={(value) =>
+                        setForm((prev) => ({ ...prev, city: value }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <span className="mb-1.5 block font-mono text-[9px] uppercase tracking-[0.07em] text-muted">
+                      Gender
+                    </span>
+                    <DarkSelectPopover
+                      id="profile-gender"
+                      label="Gender"
+                      value={form.gender}
+                      options={PROFILE_GENDER_OPTIONS.map((opt) => ({
+                        value: opt.value,
+                        label: opt.label,
+                      }))}
+                      open={openPopover === "gender"}
+                      onOpenChange={(next) =>
+                        setOpenPopover(next ? "gender" : null)
+                      }
+                      onChange={(value) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          gender: parseProfileGender(value),
+                        }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <span className="mb-1.5 block font-mono text-[9px] uppercase tracking-[0.07em] text-muted">
+                      Age group
+                    </span>
+                    <DarkSelectPopover
+                      id="profile-age"
+                      label="Age group"
+                      value={form.ageGroup}
+                      options={PROFILE_AGE_GROUP_OPTIONS.map((opt) => ({
+                        value: opt.value,
+                        label: opt.label,
+                      }))}
+                      open={openPopover === "age"}
+                      onOpenChange={(next) =>
+                        setOpenPopover(next ? "age" : null)
+                      }
+                      onChange={(value) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          ageGroup: parseProfileAgeGroup(value),
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
 
               <div>
                 <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.08em] text-muted">
@@ -332,9 +482,10 @@ export function EditProfileModal({
                   </span>
                 </div>
               </div>
+              <div className="h-8" aria-hidden />
             </div>
 
-            <div className="rabt-modal-actions mt-0 flex shrink-0 gap-2 border-t border-[color-mix(in_oklch,var(--border)_70%,transparent)] px-[22px] pt-4">
+            <div className="rabt-modal-actions mt-0 flex shrink-0 gap-2 border-t border-[color-mix(in_oklch,var(--border)_70%,transparent)] px-[22px] pt-4 pb-[max(2rem,calc(env(safe-area-inset-bottom)+1.5rem))]">
               <button
                 type="button"
                 onClick={onClose}

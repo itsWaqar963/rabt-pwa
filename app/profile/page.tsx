@@ -10,6 +10,7 @@ import { DigitalTrailRow } from "@/components/ui/DigitalTrailIcons";
 import { EditProfileModal } from "@/components/ui/EditProfileModal";
 import { ProfileSettingsModal } from "@/components/ui/ProfileSettingsModal";
 import {
+  clusterSignalItems,
   DEFAULT_PROFILE,
   formatIntentMarquee,
   initialsFromName,
@@ -27,13 +28,6 @@ import {
 import { getConfiguredSocialLinks } from "@/lib/social-links";
 
 const XP_TOTAL = 860;
-
-const CLUSTER = [
-  { label: "City", value: "Lahore" },
-  { label: "Country", value: "Pakistan" },
-  { label: "Gender", value: "Woman" },
-  { label: "Age group", value: "23–27" },
-] as const;
 
 export default function ProfilePage() {
   const reducedMotion = useReducedMotion();
@@ -310,7 +304,7 @@ export default function ProfilePage() {
             </span>
           </div>
           <div className="grid grid-cols-2 gap-x-2 gap-y-3">
-            {CLUSTER.map((item) => (
+            {clusterSignalItems(profile).map((item) => (
               <div
                 key={item.label}
                 className="min-h-[72px] rounded-[15px] border border-border bg-[color-mix(in_oklch,var(--surface)_84%,transparent)] p-3"
