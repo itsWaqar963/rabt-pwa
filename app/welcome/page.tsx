@@ -42,16 +42,28 @@ function WelcomeContent() {
 
       {/* wordmark + tagline */}
       <div className="flex flex-col items-center gap-4 text-center">
-        <div
-          lang="ar"
-          className="font-display text-7xl font-bold tracking-tight"
-          style={{
-            color: "var(--accent)",
-            textShadow:
-              "0 0 32px oklch(0.76 0.15 164 / 0.6), 0 0 8px oklch(0.76 0.15 164 / 0.4)",
-          }}
-        >
-          ربط
+        {/* glow aura ring behind text */}
+        <div className="relative flex items-center justify-center">
+          <div
+            aria-hidden
+            className="absolute size-36 rounded-full"
+            style={{
+              background:
+                "radial-gradient(circle, oklch(0.76 0.15 164 / 0.22) 0%, oklch(0.76 0.15 164 / 0.08) 55%, transparent 75%)",
+              filter: "blur(12px)",
+            }}
+          />
+          <div
+            lang="ar"
+            className="relative font-display text-7xl font-bold tracking-tight"
+            style={{
+              color: "#ffffff",
+              textShadow:
+                "0 0 48px oklch(0.96 0.02 0 / 0.85), 0 0 18px oklch(0.96 0.02 0 / 0.55), 0 0 72px oklch(0.76 0.15 164 / 0.35)",
+            }}
+          >
+            ربط
+          </div>
         </div>
         <div className="font-mono text-xs tracking-[0.3em] uppercase" style={{ color: "var(--muted)" }}>
           RABT

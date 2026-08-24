@@ -22,7 +22,8 @@ export const metadata: Metadata = {
     title: "RABT",
   },
   icons: {
-    apple: "/icons/icon-192x192.png",
+    icon: "/icons/icon.svg",
+    apple: "/icons/icon.svg",
   },
 };
 
