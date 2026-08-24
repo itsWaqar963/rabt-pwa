@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { AuthProvider } from "@/context/AuthContext";
+import { ChatNotifyProvider } from "@/components/providers/ChatNotifyProvider";
 import { MeetupStoreProvider } from "@/components/providers/MeetupStoreProvider";
 import { InstallPrompt } from "@/components/ui/InstallPrompt";
 import { OfflineBanner } from "@/components/ui/OfflineBanner";
@@ -45,9 +46,11 @@ export default function RootLayout({
         <div className="max-w-md mx-auto min-h-screen relative overflow-hidden bg-background text-foreground">
           <AuthProvider>
             <MeetupStoreProvider>
-              <OfflineBanner />
-              {children}
-              <InstallPrompt />
+              <ChatNotifyProvider>
+                <OfflineBanner />
+                {children}
+                <InstallPrompt />
+              </ChatNotifyProvider>
             </MeetupStoreProvider>
           </AuthProvider>
         </div>

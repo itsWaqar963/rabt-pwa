@@ -198,7 +198,7 @@ export function subscribeMessages(
   if (!isSupabaseConfigured) return () => {};
 
   const channel = supabase
-    .channel(`meetup-chat-${meetupId}`)
+    .channel(`meetup-chat-${meetupId}-${crypto.randomUUID()}`)
     .on(
       "postgres_changes",
       {
