@@ -52,6 +52,7 @@ function renderMeetupCard(
   return (
     <MeetupCard
       key={meetup.id}
+      meetupId={meetup.id}
       kind={meetup.kind}
       title={meetup.title}
       status={meetup.status}
@@ -344,6 +345,7 @@ export default function MeetupsPage() {
                         renderMeetupCard(meetup, {
                           requested: false,
                           hideRequest: true,
+                          showChatToggle: true,
                           requesters: getRequesters(meetup.id),
                           onRespondRequester: (requesterId, status) =>
                             respondToRequester(meetup.id, requesterId, status),

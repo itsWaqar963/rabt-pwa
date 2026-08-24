@@ -2,11 +2,13 @@
 
 import { useState } from "react";
 import { Calendar, MapPin, MessageCircle } from "lucide-react";
+import { MeetupChatPanel } from "@/components/ui/MeetupChatPanel";
 import type { JoinRequestStatus, MeetupRequester } from "@/lib/meetup-store";
 import { joinStatusLabel } from "@/lib/meetup-store";
 import { initialsFromName } from "@/lib/profile-store";
 
 export type MeetupCardProps = {
+  meetupId: string;
   kind: string;
   title: string;
   status: string;
@@ -24,7 +26,7 @@ export type MeetupCardProps = {
   hideRequest?: boolean;
   /** Blur/hide exact venue until host accepts */
   venueLocked?: boolean;
-  /** Show secure meetup chat placeholder toggle (accepted only) */
+  /** Show secure meetup chat toggle (host or accepted) */
   showChatToggle?: boolean;
   joinStatus?: JoinRequestStatus;
   onHide?: () => void;
@@ -96,6 +98,7 @@ function HostAvatar({
 }
 
 export function MeetupCard({
+  meetupId,
   kind,
   title,
   status,
@@ -197,15 +200,11 @@ export function MeetupCard({
             {chatOpen ? "Close meetup chat" : "Open meetup chat"}
           </button>
           {chatOpen ? (
-            <div className="mt-2 rounded-[12px] border border-dashed border-border bg-[color-mix(in_oklch,var(--surface)_60%,transparent)] px-3 py-4 text-center">
-              <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted">
-                Secure meetup chat
-              </p>
-              <p className="mt-1.5 text-[11px] leading-[1.45] text-muted">
-                Chat placeholder — messaging comes later. Venue is unlocked for
-                accepted guests.
-              </p>
-            </div>
+            <MeetupChatPanel
+              meetupId={meetupId}
+              meetupTitle={title}
+              canChat={showChatToggle}
+            />
           ) : null}
         </div>
       ) : null}
