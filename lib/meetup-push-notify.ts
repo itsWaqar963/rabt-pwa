@@ -61,10 +61,20 @@ export async function sendPushToUser(
 ): Promise<{ sent: number; failed: number }> {
   try {
     const admin = getSupabaseAdmin();
-    const { data: rows } = await admin
+    const { data: rows, error: subErr } = await admin
       .from("push_subscriptions")
       .select("id, subscription_json")
       .eq("user_id", userId);
+
+    if (subErr) {
+      console.error("[meetup-push-notify] load subscriptions", subErr.message);
+      return { sent: 0, failed: 0 };
+    }
+
+    if (!rows?.length) {
+      console.info("[meetup-push-notify] no subscriptions for user", userId);
+      return { sent: 0, failed: 0 };
+    }
 
     let sent = 0;
     let failed = 0;

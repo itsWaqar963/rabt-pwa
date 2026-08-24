@@ -31,13 +31,24 @@ export function resolveAppOrigin(req?: NextRequest): string {
   return "";
 }
 
+/** Absolute origin required for Web Push deep-links (PWA closed). Logs when missing. */
+export function requireAbsoluteAppOrigin(req?: NextRequest): string {
+  const origin = resolveAppOrigin(req);
+  if (!origin) {
+    console.error(
+      "[app-url] NEXT_PUBLIC_APP_URL unset — push deep-links may fail. Set to your Vercel URL.",
+    );
+  }
+  return origin;
+}
+
 /** Absolute `/meetups?chat=` URL when origin known; otherwise relative path. */
 export function absoluteMeetupChatUrl(
   meetupId: string,
   req?: NextRequest,
 ): string {
   const path = `/meetups?chat=${encodeURIComponent(meetupId)}`;
-  const origin = resolveAppOrigin(req);
+  const origin = requireAbsoluteAppOrigin(req);
   return origin ? `${origin}${path}` : path;
 }
 

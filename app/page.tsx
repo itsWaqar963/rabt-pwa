@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { SplashScreen } from "@/components/ui/SplashScreen";
@@ -12,11 +12,19 @@ import {
 } from "@/components/IceBreakerQuiz";
 import { LearningModal } from "@/components/ui/LearningModal";
 import { XpReward } from "@/components/ui/XpReward";
+import { useAuth } from "@/context/AuthContext";
+import {
+  isAwakeningCompleteLocal,
+  markAwakeningComplete,
+  syncAwakeningFromRemote,
+} from "@/lib/awakening-store";
 
 type ModalMode = "discover" | "retry";
 
 export default function Home() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
+  const [gateReady, setGateReady] = useState(false);
   const [splashDone, setSplashDone] = useState(false);
   const [selected, setSelected] = useState<OptionKey | null>(null);
   const [attempts, setAttempts] = useState(0);
@@ -27,14 +35,47 @@ export default function Home() {
   const [showXp, setShowXp] = useState(false);
   const [showSuccessCheck, setShowSuccessCheck] = useState(false);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function resolveGate() {
+      if (isAwakeningCompleteLocal()) {
+        router.replace("/discover");
+        return;
+      }
+
+      if (user?.id) {
+        const remoteDone = await syncAwakeningFromRemote(user.id);
+        if (cancelled) return;
+        if (remoteDone) {
+          router.replace("/discover");
+          return;
+        }
+      }
+
+      if (!cancelled) setGateReady(true);
+    }
+
+    if (authLoading) return;
+    void resolveGate();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, router, user?.id]);
+
   const openModal = useCallback(
     (mandatory: boolean, mode: ModalMode) => {
       setModalMandatory(mandatory);
       setModalMode(mode);
       setModalOpen(true);
     },
-    []
+    [],
   );
+
+  const finishAwakening = useCallback(() => {
+    markAwakeningComplete(user?.id ?? null);
+  }, [user?.id]);
 
   const handleSelect = useCallback(
     (key: OptionKey) => {
@@ -51,6 +92,7 @@ export default function Home() {
         if (attempts === 0) {
           setShowXp(true);
         } else {
+          finishAwakening();
           setShowXp(true);
           setShowSuccessCheck(true);
           setTimeout(() => router.push("/discover"), 1600);
@@ -61,7 +103,7 @@ export default function Home() {
       setAttempts((n) => n + 1);
       openModal(true, "retry");
     },
-    [attempts, openModal, quizLocked, router]
+    [attempts, finishAwakening, openModal, quizLocked, router],
   );
 
   const handleXpComplete = useCallback(() => {
@@ -75,17 +117,32 @@ export default function Home() {
     setModalOpen(false);
 
     if (modalMode === "discover") {
+      finishAwakening();
       router.push("/discover");
       return;
     }
 
     setSelected(null);
     setQuizLocked(false);
-  }, [modalMode, router]);
+  }, [finishAwakening, modalMode, router]);
+
+  if (!gateReady) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ background: "var(--bg)" }}
+        aria-busy="true"
+        aria-label="Loading"
+      />
+    );
+  }
 
   return (
     <>
-      <SplashScreen onComplete={() => setSplashDone(true)} />
+      <SplashScreen
+        done={isAwakeningCompleteLocal()}
+        onComplete={() => setSplashDone(true)}
+      />
 
       <AnimatePresence>
         {showXp && <XpReward amount={50} onComplete={handleXpComplete} />}

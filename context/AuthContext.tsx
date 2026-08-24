@@ -10,6 +10,7 @@ import React, {
 import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { upsertProfileFromAuth } from "@/lib/profile-sync";
+import { syncAwakeningFromRemote } from "@/lib/awakening-store";
 
 export type AuthUser = {
   id: string;
@@ -98,13 +99,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(mapped);
       setIsAuthenticated(true);
       void upsertProfileFromAuth(mapped);
+      void syncAwakeningFromRemote(mapped.id);
     }
 
     void supabase.auth.getSession().then(({ data: { session } }) => {
       if (cancelled) return;
       applySession(session, setUser, setIsAuthenticated);
       setLoading(false);
-      if (session) void refreshFromGetUser();
+      if (session?.user?.id) {
+        void refreshFromGetUser();
+        void syncAwakeningFromRemote(session.user.id);
+      }
     });
 
     const {
