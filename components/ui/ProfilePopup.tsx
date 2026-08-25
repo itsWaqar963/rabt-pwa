@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ExternalLink, Link2, MessageCircle, X } from "lucide-react";
+import { AffiliationBadges } from "@/components/ui/AffiliationBadges";
+import { PresenceDot } from "@/components/ui/PresenceDot";
 import { getFilterLabel } from "@/lib/discovery-filters";
 import type { DiscoveryUser } from "@/lib/discovery-users";
 
@@ -68,7 +70,8 @@ export function ProfilePopup({ user, open, onClose, onHide }: ProfilePopupProps)
   const scorePct = ((score - 1) / 9) * 100;
   const intentText = user?.intents.join("  ·  ") || "";
   const avatarVariant = user?.avatarVariant ?? "default";
-  const status = user?.status ?? "active";
+  const online = user?.isOnline === true;
+  const status = user?.status ?? (online ? "active" : "away");
   const photoUrl = user?.avatarUrl?.trim() || undefined;
 
   const cluster = user
@@ -182,12 +185,13 @@ export function ProfilePopup({ user, open, onClose, onHide }: ProfilePopupProps)
                     </h2>
 
                     <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
-                      <span className="inline-flex items-center gap-1 rounded-full border border-[color-mix(in_oklch,var(--accent)_45%,var(--border))] px-2 py-1 font-mono text-[9px] uppercase tracking-[0.04em] text-accent before:text-[10px] before:content-['✓']">
-                        IMS student
-                      </span>
-                      <span className="flex items-center gap-[5px] whitespace-nowrap font-mono text-[10px] text-muted before:size-1.5 before:rounded-full before:bg-accent before:shadow-[0_0_12px_color-mix(in_oklch,var(--accent)_76%,transparent)] before:content-['']">
-                        {status}
-                      </span>
+                      <AffiliationBadges
+                        isImsStudent={user.isImsStudent === true}
+                        isSourceCodeAcademia={
+                          user.isSourceCodeAcademia === true
+                        }
+                      />
+                      <PresenceDot online={online} label={status} />
                     </div>
 
                     <p className="mt-2 text-[12px] text-muted">{user.subline}</p>

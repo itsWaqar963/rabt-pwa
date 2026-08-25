@@ -21,6 +21,8 @@ import {
   MEETUP_ACKS_KEY,
   addIdOnce,
   buildCreatedMeetup,
+  computeSpotsLeft,
+  countAcceptedRequesters,
   ensureHostRequesters,
   isActiveJoinRequest,
   isLocalCreatedMeetupId,
@@ -30,6 +32,7 @@ import {
   parseHiddenIds,
   parseHostRequesters,
   parseJoinRequests,
+  purgeMeetupLocalMaps,
   seedPendingRequesters,
   toggleIdInList,
   type CreateMeetupInput,
@@ -42,6 +45,7 @@ import {
   type MeetupRequester,
 } from "@/lib/meetup-store";
 import {
+  deleteMeetup as deleteMeetupRemote,
   deletePendingJoinRequest,
   fetchHostJoinRequests,
   fetchMeetupsWithHosts,
@@ -80,6 +84,7 @@ type MeetupStoreValue = {
   ) => void;
   hideUser: (userId: string) => void;
   hideMeetup: (meetupId: string) => void;
+  deleteHostedMeetup: (meetupId: string) => Promise<boolean>;
   refresh: () => Promise<void>;
 };
 
@@ -193,8 +198,15 @@ export function MeetupStoreProvider({ children }: { children: ReactNode }) {
     const onFocus = () => {
       void refresh();
     };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
     window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [hydrated, userId, refresh]);
 
   // Supabase Dashboard → Database → Replication must enable `meetups` + `join_requests` for realtime.
@@ -209,12 +221,39 @@ export function MeetupStoreProvider({ children }: { children: ReactNode }) {
       }, 300);
     };
 
+    const dropMeetupLocally = (meetupId: string) => {
+      setRemoteMeetups((prev) => prev.filter((m) => m.id !== meetupId));
+      setCreatedMeetups((prev) => {
+        const purged = purgeMeetupLocalMaps(meetupId, prev, {}, {});
+        return purged.created;
+      });
+      setJoinRequests((prev) => {
+        const next = { ...prev };
+        delete next[meetupId];
+        return next;
+      });
+      setHostRequesters((prev) => {
+        const next = { ...prev };
+        delete next[meetupId];
+        return next;
+      });
+    };
+
     const channel = supabase
       .channel("rabt-meetups")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "meetups" },
-        scheduleRefresh,
+        (payload) => {
+          if (payload.eventType === "DELETE") {
+            const id = (payload.old as { id?: string } | null)?.id;
+            if (id) {
+              dropMeetupLocally(id);
+              return;
+            }
+          }
+          scheduleRefresh();
+        },
       )
       .on(
         "postgres_changes",
@@ -412,6 +451,7 @@ export function MeetupStoreProvider({ children }: { children: ReactNode }) {
               hostUserId: userId,
               hostAvatarUrl: user?.avatarUrl,
               spotsLeft: remote.maxSpots,
+              acceptedCount: 0,
               city: remote.city,
               country: remote.country,
               source: "remote",
@@ -422,6 +462,7 @@ export function MeetupStoreProvider({ children }: { children: ReactNode }) {
               maxSpots: remote.maxSpots,
               descriptionRaw: remote.description,
               createdAt: remote.createdAt,
+              hostIsOnline: true,
             };
             setRemoteMeetups((prev) =>
               prev.some((m) => m.id === remote.id)
@@ -470,6 +511,26 @@ export function MeetupStoreProvider({ children }: { children: ReactNode }) {
         };
       });
 
+      // Optimistic spotsLeft on accept/decline
+      setRemoteMeetups((prev) =>
+        prev.map((m) => {
+          if (m.id !== meetupId) return m;
+          const nextList = (list ?? []).map((r) =>
+            r.id === requesterId ? { ...r, status } : r,
+          );
+          const accepted = countAcceptedRequesters(nextList);
+          const max = m.maxSpots ?? m.spotsLeft + (m.acceptedCount ?? 0);
+          const spotsLeft = computeSpotsLeft(max, accepted);
+          return {
+            ...m,
+            acceptedCount: accepted,
+            spotsLeft,
+            status: `${spotsLeft} spots left`,
+            maxSpots: max,
+          };
+        }),
+      );
+
       // Same-device: if I accepted myself as requester, mirror join status
       if (status === "accepted" && requesterId === userId) {
         setJoinRequests((prev) => ({ ...prev, [meetupId]: "accepted" }));
@@ -510,6 +571,42 @@ export function MeetupStoreProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
+  const deleteHostedMeetup = useCallback(
+    async (meetupId: string): Promise<boolean> => {
+      const applyLocalPurge = () => {
+        setRemoteMeetups((prev) => prev.filter((m) => m.id !== meetupId));
+        setCreatedMeetups((prev) => {
+          const purged = purgeMeetupLocalMaps(
+            meetupId,
+            prev,
+            joinRequests,
+            hostRequesters,
+          );
+          setJoinRequests(purged.joinRequests);
+          setHostRequesters(purged.hostRequesters);
+          return purged.created;
+        });
+      };
+
+      if (
+        canUseRemote(userId) &&
+        typeof navigator !== "undefined" &&
+        navigator.onLine &&
+        !meetupId.startsWith("created-")
+      ) {
+        const ok = await deleteMeetupRemote(meetupId);
+        if (!ok) return false;
+        applyLocalPurge();
+        return true;
+      }
+
+      // Local-only meetup
+      applyLocalPurge();
+      return true;
+    },
+    [userId, joinRequests, hostRequesters],
+  );
+
   const value = useMemo<MeetupStoreValue>(
     () => ({
       hydrated,
@@ -534,6 +631,7 @@ export function MeetupStoreProvider({ children }: { children: ReactNode }) {
       respondToRequester,
       hideUser,
       hideMeetup,
+      deleteHostedMeetup,
       refresh,
     }),
     [
@@ -559,6 +657,7 @@ export function MeetupStoreProvider({ children }: { children: ReactNode }) {
       respondToRequester,
       hideUser,
       hideMeetup,
+      deleteHostedMeetup,
       refresh,
     ],
   );

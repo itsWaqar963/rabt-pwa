@@ -28,6 +28,8 @@ export type ProfileRow = {
   introvert_extrovert: number | null;
   subline: string | null;
   is_ims_student: boolean | null;
+  is_source_code_academia: boolean | null;
+  last_seen_at: string | null;
   gender: string | null;
   age_group: string | null;
   city: string | null;
@@ -36,7 +38,7 @@ export type ProfileRow = {
 };
 
 const PROFILE_COLUMNS =
-  "id, full_name, email, avatar_url, active_intent, skills, social_urls, introvert_extrovert, subline, is_ims_student, gender, age_group, city, country, updated_at";
+  "id, full_name, email, avatar_url, active_intent, skills, social_urls, introvert_extrovert, subline, is_ims_student, is_source_code_academia, last_seen_at, gender, age_group, city, country, updated_at";
 
 function clampScore(score: number): number {
   return Math.min(10, Math.max(1, Math.round(score)));
@@ -75,6 +77,10 @@ export function mergeRemoteEditable(
       typeof row.is_ims_student === "boolean"
         ? row.is_ims_student
         : local.isImsStudent,
+    isSourceCodeAcademia:
+      typeof row.is_source_code_academia === "boolean"
+        ? row.is_source_code_academia
+        : local.isSourceCodeAcademia,
     gender:
       typeof row.gender === "string"
         ? parseProfileGender(row.gender)
@@ -144,6 +150,7 @@ export async function saveProfileRemote(
       introvert_extrovert: clampScore(profile.introvertExtrovert),
       subline: profile.subline,
       is_ims_student: profile.isImsStudent,
+      is_source_code_academia: profile.isSourceCodeAcademia,
       gender: profile.gender,
       age_group: profile.ageGroup,
       city: profile.city,

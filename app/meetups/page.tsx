@@ -7,6 +7,7 @@ import { BottomNav } from "@/components/layout/BottomNav";
 import { useChatNotify } from "@/components/providers/ChatNotifyProvider";
 import { useMeetupStore } from "@/components/providers/MeetupStoreProvider";
 import { CreateMeetupModal } from "@/components/ui/CreateMeetupModal";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { FilterPills } from "@/components/ui/FilterPills";
 import { MeetupCard } from "@/components/ui/MeetupCard";
 import { ProfileHeaderButton } from "@/components/ui/ProfileHeaderButton";
@@ -23,6 +24,7 @@ import {
   type HostedMeetup,
 } from "@/lib/discovery-users";
 import {
+  countAcceptedRequesters,
   createdMeetupToHosted,
   filterHostedMeetups,
   isActiveJoinRequest,
@@ -44,6 +46,7 @@ function renderMeetupCard(
     showChatToggle?: boolean;
     joinStatus?: JoinRequestStatus;
     onHide?: () => void;
+    onDelete?: () => void;
     requesters?: MeetupRequester[];
     onRespondRequester?: (
       requesterId: string,
@@ -64,6 +67,8 @@ function renderMeetupCard(
       organizerName={meetup.organizerName}
       organizerRole={meetup.organizerRole}
       hostAvatarUrl={meetup.hostAvatarUrl}
+      hostIsImsStudent={meetup.hostIsImsStudent}
+      hostIsSourceCodeAcademia={meetup.hostIsSourceCodeAcademia}
       spotsLeft={meetup.spotsLeft}
       requested={opts.requested}
       onRequestToggle={opts.onRequestToggle}
@@ -72,6 +77,7 @@ function renderMeetupCard(
       showChatToggle={opts.showChatToggle}
       joinStatus={opts.joinStatus}
       onHide={opts.onHide}
+      onDelete={opts.onDelete}
       requesters={opts.requesters}
       onRespondRequester={opts.onRespondRequester}
     />
@@ -90,6 +96,8 @@ function MeetupsPageContent() {
   const [activeTab, setActiveTab] = useState<Tab>("explore");
   const [createOpen, setCreateOpen] = useState(false);
   const [filters, setFilters] = useState<DiscoveryFilters>(DEFAULT_FILTERS);
+  const [deleteTarget, setDeleteTarget] = useState<HostedMeetup | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const { user } = useAuth();
   const searchParams = useSearchParams();
   const { requestOpenChat } = useChatNotify();
@@ -108,6 +116,7 @@ function MeetupsPageContent() {
     respondToRequester,
     hideMeetup,
     isMeetupHidden,
+    deleteHostedMeetup,
   } = useMeetupStore();
   const { isOffline } = useNetworkStatus();
 
@@ -119,9 +128,14 @@ function MeetupsPageContent() {
   const createdAsHosted = useMemo(
     () =>
       createdMeetups
-        .map(createdMeetupToHosted)
+        .map((m) =>
+          createdMeetupToHosted(
+            m,
+            countAcceptedRequesters(getRequesters(m.id)),
+          ),
+        )
         .filter((m) => !isMeetupHidden(m.id)),
-    [createdMeetups, isMeetupHidden],
+    [createdMeetups, isMeetupHidden, getRequesters],
   );
 
   const allExplore = useMemo(() => {
@@ -383,6 +397,7 @@ function MeetupsPageContent() {
                           onRespondRequester: (requesterId, status) =>
                             respondToRequester(meetup.id, requesterId, status),
                           onHide: () => hideMeetup(meetup.id),
+                          onDelete: () => setDeleteTarget(meetup),
                         }),
                       )}
                     </div>
@@ -453,6 +468,30 @@ function MeetupsPageContent() {
         onClose={() => setCreateOpen(false)}
         onSubmit={(input) => {
           void addCreatedMeetup(input);
+        }}
+      />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Delete meetup?"
+        description={
+          deleteTarget
+            ? `"${deleteTarget.title}" will be removed for everyone. Join requests and chat messages are deleted too.`
+            : ""
+        }
+        confirmLabel="Delete"
+        danger
+        busy={deleteBusy}
+        onCancel={() => {
+          if (!deleteBusy) setDeleteTarget(null);
+        }}
+        onConfirm={() => {
+          if (!deleteTarget) return;
+          setDeleteBusy(true);
+          void deleteHostedMeetup(deleteTarget.id).then((ok) => {
+            setDeleteBusy(false);
+            if (ok) setDeleteTarget(null);
+          });
         }}
       />
     </div>

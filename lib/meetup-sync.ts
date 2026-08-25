@@ -2,6 +2,7 @@ import type { HostedMeetup } from "@/lib/discovery-users";
 import {
   formatMeetupWhen,
   isMeetupCategory,
+  computeSpotsLeft,
   type CreateMeetupInput,
   type CreatedMeetup,
   type JoinRequestStatus,
@@ -13,10 +14,11 @@ import {
   parseProfileGender,
 } from "@/lib/profile-store";
 import { withJwtRetry } from "@/lib/auth-retry";
+import { isProfileOnline } from "@/lib/presence";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 const HOST_PROFILE_COLS =
-  "id, full_name, avatar_url, subline, city, country, gender, age_group, active_intent, skills";
+  "id, full_name, avatar_url, subline, city, country, gender, age_group, active_intent, skills, introvert_extrovert, is_ims_student, is_source_code_academia, last_seen_at";
 
 type HostProfileRow = {
   id: string;
@@ -29,6 +31,10 @@ type HostProfileRow = {
   age_group: string | null;
   active_intent: string | null;
   skills: string[] | null;
+  introvert_extrovert: number | null;
+  is_ims_student: boolean | null;
+  is_source_code_academia: boolean | null;
+  last_seen_at: string | null;
 };
 
 type MeetupRow = {
@@ -134,21 +140,27 @@ function nonEmptyAvatar(
 export function mapMeetupRowToHosted(
   row: MeetupRow,
   profile?: HostProfileRow | null,
+  acceptedCount = 0,
 ): HostedMeetup {
   const host = profile ?? asProfile(row.profiles);
   const category = toCategory(row.category);
-  const spots = typeof row.max_spots === "number" ? row.max_spots : 0;
+  const maxSpots = typeof row.max_spots === "number" ? row.max_spots : 0;
+  const spotsLeft = computeSpotsLeft(maxSpots, acceptedCount);
   const date = row.date ?? "";
   const time = row.time ?? "";
   const venue = row.venue?.trim() || "Venue TBA";
   const name = host?.full_name?.trim() || "Host";
   const role = host?.subline?.split(" · ")[0]?.trim() || host?.subline || "Host";
+  const introvert =
+    typeof host?.introvert_extrovert === "number"
+      ? Math.min(10, Math.max(1, Math.round(host.introvert_extrovert)))
+      : undefined;
 
   return {
     id: row.id,
     kind: `Physical gathering · ${category.toLowerCase()}`,
     title: row.title,
-    status: `${spots} spots left`,
+    status: `${spotsLeft} spots left`,
     description:
       row.description?.trim() ||
       host?.active_intent?.trim() ||
@@ -158,7 +170,7 @@ export function mapMeetupRowToHosted(
     organizerName: name,
     organizerRole: role,
     hostUserId: row.host_id,
-    spotsLeft: spots,
+    spotsLeft,
     city: (row.city || host?.city || "").toLowerCase() || "all",
     country: (row.country || host?.country || "").toLowerCase() || "all",
     source: "remote",
@@ -169,13 +181,19 @@ export function mapMeetupRowToHosted(
     hostIntent: host?.active_intent ?? undefined,
     hostSkills: host?.skills ?? undefined,
     hostInitial: initialFromName(name),
+    hostIntrovertExtrovert: introvert,
+    hostIsImsStudent: host?.is_ims_student === true,
+    hostIsSourceCodeAcademia: host?.is_source_code_academia === true,
+    hostLastSeenAt: host?.last_seen_at ?? undefined,
+    hostIsOnline: isProfileOnline(host?.last_seen_at),
     date,
     time,
     category,
     venue,
-    maxSpots: spots,
+    maxSpots,
     descriptionRaw: row.description ?? "",
     createdAt: row.created_at,
+    acceptedCount,
   };
 }
 
@@ -222,6 +240,32 @@ async function fetchProfilesByIds(
   return map;
 }
 
+/** Batch count of accepted join_requests per meetup (host does not consume a spot). */
+export async function fetchAcceptedCounts(
+  meetupIds: string[],
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  const unique = [...new Set(meetupIds.filter(Boolean))];
+  if (unique.length === 0) return map;
+
+  const { data, error } = await supabase
+    .from("join_requests")
+    .select("meetup_id")
+    .in("meetup_id", unique)
+    .eq("status", "accepted");
+
+  if (error) {
+    logRemoteError("fetchAcceptedCounts", error);
+    return map;
+  }
+
+  for (const row of data ?? []) {
+    if (typeof row.meetup_id !== "string") continue;
+    map.set(row.meetup_id, (map.get(row.meetup_id) ?? 0) + 1);
+  }
+  return map;
+}
+
 export async function fetchMeetupsWithHosts(): Promise<HostedMeetup[]> {
   if (!isSupabaseConfigured) return [];
 
@@ -246,10 +290,18 @@ export async function fetchMeetupsWithHosts(): Promise<HostedMeetup[]> {
       (row) => !row.status || row.status === "open",
     );
 
-    const profileMap = await fetchProfilesByIds(openRows.map((r) => r.host_id));
+    const meetupIds = openRows.map((r) => r.id);
+    const [profileMap, acceptedMap] = await Promise.all([
+      fetchProfilesByIds(openRows.map((r) => r.host_id)),
+      fetchAcceptedCounts(meetupIds),
+    ]);
 
     let mapped = openRows.map((row) =>
-      mapMeetupRowToHosted(row, profileMap.get(row.host_id) ?? null),
+      mapMeetupRowToHosted(
+        row,
+        profileMap.get(row.host_id) ?? null,
+        acceptedMap.get(row.id) ?? 0,
+      ),
     );
 
     // Fill stale embeds that have host but no avatar_url
@@ -270,6 +322,27 @@ export async function fetchMeetupsWithHosts(): Promise<HostedMeetup[]> {
   } catch (err) {
     logRemoteError("fetchMeetupsWithHosts", err);
     return [];
+  }
+}
+
+/** Host-only delete (RLS: "Hosts can delete own meetups"). Cascades join_requests + messages. */
+export async function deleteMeetup(meetupId: string): Promise<boolean> {
+  if (!isSupabaseConfigured || !meetupId) return false;
+
+  try {
+    const { error } = await supabase
+      .from("meetups")
+      .delete()
+      .eq("id", meetupId);
+
+    if (error) {
+      logRemoteError("deleteMeetup", error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    logRemoteError("deleteMeetup", err);
+    return false;
   }
 }
 

@@ -6,10 +6,16 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { LogOut, X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import type { ProfileData } from "@/lib/profile-store";
 
 export type ProfileSettingsModalProps = {
   open: boolean;
   onClose: () => void;
+  profile?: ProfileData;
+  onSaveAffiliations?: (patch: {
+    isImsStudent: boolean;
+    isSourceCodeAcademia: boolean;
+  }) => void;
 };
 
 type PreferenceKey = "notifications" | "meetupReminders" | "profileVisible";
@@ -36,6 +42,8 @@ const PREFERENCES: { key: PreferenceKey; label: string; description: string }[] 
 export function ProfileSettingsModal({
   open,
   onClose,
+  profile,
+  onSaveAffiliations,
 }: ProfileSettingsModalProps) {
   const titleId = useId();
   const reducedMotion = useReducedMotion();
@@ -48,6 +56,12 @@ export function ProfileSettingsModal({
     meetupReminders: true,
     profileVisible: true,
   });
+  const [isImsStudent, setIsImsStudent] = useState(
+    profile?.isImsStudent ?? false,
+  );
+  const [isSourceCodeAcademia, setIsSourceCodeAcademia] = useState(
+    profile?.isSourceCodeAcademia ?? false,
+  );
 
   async function handleLogout() {
     setSigningOut(true);
@@ -65,6 +79,12 @@ export function ProfileSettingsModal({
       document.querySelector<HTMLElement>(".max-w-md.mx-auto.min-h-screen"),
     );
   }, []);
+
+  useEffect(() => {
+    if (!open || !profile) return;
+    setIsImsStudent(profile.isImsStudent);
+    setIsSourceCodeAcademia(profile.isSourceCodeAcademia);
+  }, [open, profile]);
 
   useEffect(() => {
     if (!open) return;
@@ -87,6 +107,13 @@ export function ProfileSettingsModal({
   if (!shell) return null;
 
   const duration = reducedMotion ? 0.01 : 0.28;
+
+  function persistAffiliations(nextIms: boolean, nextSca: boolean) {
+    onSaveAffiliations?.({
+      isImsStudent: nextIms,
+      isSourceCodeAcademia: nextSca,
+    });
+  }
 
   return createPortal(
     <AnimatePresence>
@@ -143,70 +170,118 @@ export function ProfileSettingsModal({
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-[22px] [scrollbar-width:thin]">
-            <p className="mt-3 text-xs leading-[1.5] text-muted">
-              Account preferences — toggles are placeholders for a future sync
-              layer.
-            </p>
+              <p className="mt-3 text-xs leading-[1.5] text-muted">
+                Account preferences — notification toggles are placeholders for
+                a future sync layer.
+              </p>
 
-            <ul className="mt-5 space-y-3">
-              {PREFERENCES.map((pref) => (
-                <li
-                  key={pref.key}
-                  className="flex items-start justify-between gap-3 rounded-[14px] border border-border bg-[color-mix(in_oklch,var(--surface)_72%,transparent)] p-3.5"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-foreground">
-                      {pref.label}
-                    </p>
-                    <p className="mt-0.5 text-[11px] leading-[1.45] text-muted">
-                      {pref.description}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={prefs[pref.key]}
-                    aria-label={pref.label}
-                    onClick={() =>
-                      setPrefs((prev) => ({
-                        ...prev,
-                        [pref.key]: !prev[pref.key],
-                      }))
-                    }
-                    className={`relative mt-0.5 h-6 w-11 shrink-0 rounded-full border transition-[background,border-color] duration-200 ${
-                      prefs[pref.key]
-                        ? "border-[color-mix(in_oklch,var(--accent)_55%,var(--border))] bg-[color-mix(in_oklch,var(--accent)_28%,transparent)]"
-                        : "border-border bg-black/30"
-                    }`}
-                  >
-                    <span
-                      className={`absolute top-0.5 size-5 rounded-full bg-foreground shadow transition-[left] duration-200 ${
-                        prefs[pref.key] ? "left-[22px]" : "left-0.5"
-                      }`}
+              {onSaveAffiliations ? (
+                <fieldset className="mt-5 space-y-3 rounded-[14px] border border-border bg-[color-mix(in_oklch,var(--surface)_72%,transparent)] p-3.5">
+                  <legend className="px-1 font-mono text-[10px] uppercase tracking-[0.08em] text-muted">
+                    Affiliations
+                  </legend>
+                  <label className="flex cursor-pointer items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={isImsStudent}
+                      onChange={(event) => {
+                        const next = event.target.checked;
+                        setIsImsStudent(next);
+                        persistAffiliations(next, isSourceCodeAcademia);
+                      }}
+                      className="mt-0.5 size-4 accent-[var(--accent)]"
                     />
-                  </button>
-                </li>
-              ))}
-            </ul>
+                    <span>
+                      <span className="block text-sm font-medium text-foreground">
+                        IMS
+                      </span>
+                      <span className="mt-0.5 block text-[11px] text-muted">
+                        Verified IMS badge on Discover cards.
+                      </span>
+                    </span>
+                  </label>
+                  <label className="flex cursor-pointer items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={isSourceCodeAcademia}
+                      onChange={(event) => {
+                        const next = event.target.checked;
+                        setIsSourceCodeAcademia(next);
+                        persistAffiliations(isImsStudent, next);
+                      }}
+                      className="mt-0.5 size-4 accent-[var(--accent)]"
+                    />
+                    <span>
+                      <span className="block text-sm font-medium text-foreground">
+                        Source Code Academia
+                      </span>
+                      <span className="mt-0.5 block text-[11px] text-muted">
+                        Verified Source Code Academia badge.
+                      </span>
+                    </span>
+                  </label>
+                </fieldset>
+              ) : null}
+
+              <ul className="mt-5 space-y-3">
+                {PREFERENCES.map((pref) => (
+                  <li
+                    key={pref.key}
+                    className="flex items-start justify-between gap-3 rounded-[14px] border border-border bg-[color-mix(in_oklch,var(--surface)_72%,transparent)] p-3.5"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-foreground">
+                        {pref.label}
+                      </p>
+                      <p className="mt-0.5 text-[11px] leading-[1.45] text-muted">
+                        {pref.description}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={prefs[pref.key]}
+                      aria-label={pref.label}
+                      onClick={() =>
+                        setPrefs((prev) => ({
+                          ...prev,
+                          [pref.key]: !prev[pref.key],
+                        }))
+                      }
+                      className={`relative mt-0.5 h-6 w-11 shrink-0 rounded-full border transition-[background,border-color] duration-200 ${
+                        prefs[pref.key]
+                          ? "border-[color-mix(in_oklch,var(--accent)_55%,var(--border))] bg-[color-mix(in_oklch,var(--accent)_28%,transparent)]"
+                          : "border-border bg-black/30"
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-0.5 size-5 rounded-full bg-foreground shadow transition-[left] duration-200 ${
+                          prefs[pref.key] ? "left-[22px]" : "left-0.5"
+                        }`}
+                      />
+                    </button>
+                  </li>
+                ))}
+              </ul>
             </div>
 
             <div className="rabt-modal-actions shrink-0 flex flex-col gap-2 px-[22px] pt-4">
-            <button
-              type="button"
-              onClick={() => void handleLogout()}
-              disabled={signingOut}
-              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[12px] border border-[color-mix(in_oklch,oklch(0.65_0.18_25)_40%,var(--border))] px-3 text-sm text-[oklch(0.78_0.12_25)] transition-colors hover:border-[oklch(0.7_0.15_25)] disabled:opacity-50"
-            >
-              <LogOut className="size-4" strokeWidth={1.8} />
-              {signingOut ? "Signing out…" : "Sign out"}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="inline-flex min-h-11 w-full items-center justify-center rounded-[12px] border border-border px-3 text-sm text-foreground transition-colors hover:border-foreground"
-            >
-              Done
-            </button>
+              <button
+                type="button"
+                onClick={() => void handleLogout()}
+                disabled={signingOut}
+                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[12px] border border-[color-mix(in_oklch,oklch(0.65_0.18_25)_40%,var(--border))] px-3 text-sm text-[oklch(0.78_0.12_25)] transition-colors hover:border-[oklch(0.7_0.15_25)] disabled:opacity-50"
+              >
+                <LogOut className="size-4" strokeWidth={1.8} />
+                {signingOut ? "Signing out…" : "Sign out"}
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-[12px] border border-border px-3 text-sm text-foreground transition-colors hover:border-foreground"
+              >
+                Done
+              </button>
             </div>
           </motion.div>
         </div>

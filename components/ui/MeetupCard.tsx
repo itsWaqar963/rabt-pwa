@@ -1,7 +1,8 @@
 "use client";
 
-import { Calendar, MapPin, MessageCircle } from "lucide-react";
+import { Calendar, MapPin, MessageCircle, Trash2 } from "lucide-react";
 import { useChatNotify } from "@/components/providers/ChatNotifyProvider";
+import { AffiliationBadges } from "@/components/ui/AffiliationBadges";
 import type { JoinRequestStatus, MeetupRequester } from "@/lib/meetup-store";
 import { joinStatusLabel } from "@/lib/meetup-store";
 import { initialsFromName } from "@/lib/profile-store";
@@ -18,6 +19,8 @@ export type MeetupCardProps = {
   organizerRole: string;
   /** Google / profile photo for host */
   hostAvatarUrl?: string;
+  hostIsImsStudent?: boolean;
+  hostIsSourceCodeAcademia?: boolean;
   spotsLeft?: number;
   requested?: boolean;
   onRequestToggle?: () => void;
@@ -29,6 +32,8 @@ export type MeetupCardProps = {
   showChatToggle?: boolean;
   joinStatus?: JoinRequestStatus;
   onHide?: () => void;
+  /** Host-only delete (My Events → Hosted) */
+  onDelete?: () => void;
   requesters?: MeetupRequester[];
   onRespondRequester?: (
     requesterId: string,
@@ -107,6 +112,8 @@ export function MeetupCard({
   organizerName,
   organizerRole,
   hostAvatarUrl,
+  hostIsImsStudent = false,
+  hostIsSourceCodeAcademia = false,
   spotsLeft,
   requested = false,
   onRequestToggle,
@@ -115,6 +122,7 @@ export function MeetupCard({
   showChatToggle = false,
   joinStatus,
   onHide,
+  onDelete,
   requesters,
   onRespondRequester,
 }: MeetupCardProps) {
@@ -180,13 +188,22 @@ export function MeetupCard({
 
       <div className="mt-3 flex items-center gap-2.5">
         <HostAvatar name={organizerName} avatarUrl={hostAvatarUrl} />
-        <p className="min-w-0 text-[10px] text-muted">
-          Hosted by{" "}
-          <strong className="font-semibold text-foreground">
-            {organizerName}
-          </strong>{" "}
-          · {organizerRole}
-        </p>
+        <div className="min-w-0 flex-1">
+          <p className="min-w-0 text-[10px] text-muted">
+            Hosted by{" "}
+            <strong className="font-semibold text-foreground">
+              {organizerName}
+            </strong>{" "}
+            · {organizerRole}
+          </p>
+          <div className="mt-1 flex flex-wrap gap-1">
+            <AffiliationBadges
+              isImsStudent={hostIsImsStudent}
+              isSourceCodeAcademia={hostIsSourceCodeAcademia}
+              compact
+            />
+          </div>
+        </div>
       </div>
 
       {showChatToggle ? (
@@ -288,6 +305,17 @@ export function MeetupCard({
           {requested ? "Request sent" : "Request to Join"}
         </button>
       )}
+
+      {onDelete ? (
+        <button
+          type="button"
+          onClick={onDelete}
+          className="mt-2 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-[11px] border border-[color-mix(in_oklch,oklch(0.65_0.18_25)_40%,var(--border))] bg-transparent px-3 text-[11px] font-semibold text-[oklch(0.78_0.12_25)] transition-[background,border-color] duration-150 hover:bg-[color-mix(in_oklch,oklch(0.65_0.18_25)_12%,transparent)]"
+        >
+          <Trash2 className="size-3.5" strokeWidth={1.8} aria-hidden />
+          Delete meetup
+        </button>
+      ) : null}
 
       {onHide ? (
         <button

@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { Calendar, MapPin } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
+import { AffiliationBadges } from "@/components/ui/AffiliationBadges";
+import { PresenceDot } from "@/components/ui/PresenceDot";
 
 export type UserCardMeetup = {
   id: string;
@@ -32,6 +34,9 @@ export type UserCardProps = {
   onPrimaryAction?: () => void;
   onViewProfile?: () => void;
   onHide?: () => void;
+  isImsStudent?: boolean;
+  isSourceCodeAcademia?: boolean;
+  isOnline?: boolean;
 };
 
 const AVATAR_BG: Record<NonNullable<UserCardProps["avatarVariant"]>, string> = {
@@ -54,7 +59,7 @@ export function UserCard({
   tags,
   avatarUrl,
   avatarVariant = "default",
-  status = "active",
+  status,
   personalityScore,
   cityLabel,
   countryLabel,
@@ -63,6 +68,9 @@ export function UserCard({
   onPrimaryAction,
   onViewProfile,
   onHide,
+  isImsStudent = false,
+  isSourceCodeAcademia = false,
+  isOnline = false,
 }: UserCardProps) {
   const reducedMotion = useReducedMotion();
   const intentText = intents.join("  ·  ") || "";
@@ -71,6 +79,7 @@ export function UserCard({
     personalityScore !== undefined ? clampScore(personalityScore) : null;
   const scorePct = score !== null ? ((score - 1) / 9) * 100 : 0;
   const photoUrl = avatarUrl?.trim() || undefined;
+  const statusLabel = status ?? (isOnline ? "active" : "away");
 
   const viewProfileClassName =
     "inline-flex min-h-11 flex-1 items-center justify-center rounded-[11px] border border-border bg-transparent px-3 text-[11px] text-foreground transition-[border-color,background] duration-150 hover:border-foreground hover:bg-[color-mix(in_oklch,var(--fg)_6%,transparent)]";
@@ -117,9 +126,10 @@ export function UserCard({
             <h3 className="font-body text-[15px] font-semibold tracking-[-0.01em] text-foreground">
               {name}
             </h3>
-            <span className="inline-flex items-center gap-1 rounded-full border border-[color-mix(in_oklch,var(--accent)_45%,var(--border))] px-1.5 py-[3px] font-mono text-[8px] uppercase tracking-[0.04em] text-accent before:text-[9px] before:content-['✓']">
-              IMS student
-            </span>
+            <AffiliationBadges
+              isImsStudent={isImsStudent}
+              isSourceCodeAcademia={isSourceCodeAcademia}
+            />
           </div>
           <p className="mt-[3px] text-[11px] text-muted">{subline}</p>
           {locationLine ? (
@@ -127,9 +137,11 @@ export function UserCard({
           ) : null}
         </div>
 
-        <span className="flex items-center gap-[5px] whitespace-nowrap font-mono text-[9px] text-muted before:size-1.5 before:rounded-full before:bg-accent before:shadow-[0_0_12px_color-mix(in_oklch,var(--accent)_76%,transparent)] before:content-[''] max-[360px]:col-start-2">
-          {status}
-        </span>
+        <PresenceDot
+          online={isOnline}
+          label={statusLabel}
+          className="max-[360px]:col-start-2"
+        />
       </div>
 
       {score !== null ? (

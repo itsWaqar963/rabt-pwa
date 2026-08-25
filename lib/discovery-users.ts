@@ -28,6 +28,10 @@ export type DiscoveryUser = UserCardProps & {
   personalityScore: number;
   links: DiscoveryUserLinks;
   meetup?: DiscoveryMeetup;
+  isImsStudent?: boolean;
+  isSourceCodeAcademia?: boolean;
+  isOnline?: boolean;
+  lastSeenAt?: string;
 };
 
 export type HostedMeetup = {
@@ -53,6 +57,11 @@ export type HostedMeetup = {
   hostIntent?: string;
   hostSkills?: string[];
   hostInitial?: string;
+  hostIntrovertExtrovert?: number;
+  hostIsImsStudent?: boolean;
+  hostIsSourceCodeAcademia?: boolean;
+  hostLastSeenAt?: string;
+  hostIsOnline?: boolean;
   /** Raw create fields when available */
   date?: string;
   time?: string;
@@ -61,6 +70,7 @@ export type HostedMeetup = {
   maxSpots?: number;
   descriptionRaw?: string;
   createdAt?: string;
+  acceptedCount?: number;
 };
 
 export const DISCOVERY_USERS: DiscoveryUser[] = [
@@ -434,6 +444,10 @@ export function hostedMeetupToDiscoveryUser(
     meetup.country,
     ...skills,
   ].filter(Boolean);
+  const personalityScore =
+    typeof meetup.hostIntrovertExtrovert === "number"
+      ? meetup.hostIntrovertExtrovert
+      : 5;
 
   return {
     id: meetup.id,
@@ -448,7 +462,11 @@ export function hostedMeetupToDiscoveryUser(
     city: meetup.city,
     gender: meetup.hostGender ?? "men",
     ageGroup: meetup.hostAgeGroup ?? "25-34",
-    personalityScore: 5,
+    personalityScore,
+    isImsStudent: meetup.hostIsImsStudent === true,
+    isSourceCodeAcademia: meetup.hostIsSourceCodeAcademia === true,
+    isOnline: meetup.hostIsOnline === true,
+    lastSeenAt: meetup.hostLastSeenAt,
     links: {},
     meetup: {
       id: meetup.id,

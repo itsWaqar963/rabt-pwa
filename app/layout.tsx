@@ -3,6 +3,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { ChatNotifyProvider } from "@/components/providers/ChatNotifyProvider";
 import { GlobalMeetupChatHost } from "@/components/providers/GlobalMeetupChatHost";
 import { MeetupStoreProvider } from "@/components/providers/MeetupStoreProvider";
+import { PresenceHeartbeat } from "@/components/presence/PresenceHeartbeat";
 import { ServiceWorkerRegister } from "@/components/pwa/ServiceWorkerRegister";
 import { InstallPrompt } from "@/components/ui/InstallPrompt";
 import { NotificationPermissionBanner } from "@/components/ui/NotificationPermissionBanner";
@@ -50,6 +51,7 @@ export default function RootLayout({
           <AuthProvider>
             <MeetupStoreProvider>
               <ChatNotifyProvider>
+                <PresenceHeartbeat />
                 <ServiceWorkerRegister />
                 <OfflineBanner />
                 <NotificationPermissionBanner />

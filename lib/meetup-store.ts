@@ -296,13 +296,53 @@ export function formatMeetupWhen(date: string, time: string): string {
   return `${day} · ${clock}`;
 }
 
-export function createdMeetupToHosted(meetup: CreatedMeetup): HostedMeetup {
+export function computeSpotsLeft(
+  maxSpots: number,
+  acceptedCount: number,
+): number {
+  return Math.max(0, maxSpots - Math.max(0, acceptedCount));
+}
+
+export function countAcceptedRequesters(
+  requesters: MeetupRequester[] | undefined,
+): number {
+  if (!requesters) return 0;
+  return requesters.filter((r) => r.status === "accepted").length;
+}
+
+/** Drop meetup id from created list + join / host requester maps. */
+export function purgeMeetupLocalMaps(
+  meetupId: string,
+  created: CreatedMeetup[],
+  joinRequests: JoinRequestsState,
+  hostRequesters: HostRequestersState,
+): {
+  created: CreatedMeetup[];
+  joinRequests: JoinRequestsState;
+  hostRequesters: HostRequestersState;
+} {
+  const nextJoins = { ...joinRequests };
+  delete nextJoins[meetupId];
+  const nextHost = { ...hostRequesters };
+  delete nextHost[meetupId];
+  return {
+    created: created.filter((m) => m.id !== meetupId),
+    joinRequests: nextJoins,
+    hostRequesters: nextHost,
+  };
+}
+
+export function createdMeetupToHosted(
+  meetup: CreatedMeetup,
+  acceptedCount = 0,
+): HostedMeetup {
   const remote = Boolean(meetup.hostUserId) && !isLocalCreatedMeetupId(meetup.id);
+  const spotsLeft = computeSpotsLeft(meetup.maxSpots, acceptedCount);
   return {
     id: meetup.id,
     kind: `Physical gathering · ${meetup.category.toLowerCase()}`,
     title: meetup.title,
-    status: `${meetup.maxSpots} spots left`,
+    status: `${spotsLeft} spots left`,
     description:
       meetup.description.trim() ||
       `${meetup.category} meetup at ${meetup.venue}.`,
@@ -311,7 +351,7 @@ export function createdMeetupToHosted(meetup: CreatedMeetup): HostedMeetup {
     organizerName: "You",
     organizerRole: "Host",
     hostUserId: meetup.hostUserId ?? "self",
-    spotsLeft: meetup.maxSpots,
+    spotsLeft,
     city: meetup.city,
     country: meetup.country,
     source: remote ? "remote" : "created",
@@ -322,6 +362,8 @@ export function createdMeetupToHosted(meetup: CreatedMeetup): HostedMeetup {
     maxSpots: meetup.maxSpots,
     descriptionRaw: meetup.description,
     createdAt: meetup.createdAt,
+    acceptedCount,
+    hostIsOnline: true,
   };
 }
 

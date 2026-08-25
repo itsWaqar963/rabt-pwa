@@ -18,6 +18,7 @@ export type ProfileData = {
   initial: string;
   subline: string;
   isImsStudent: boolean;
+  isSourceCodeAcademia: boolean;
   activeIntent: string;
   skills: string[];
   socialUrls: SocialUrls;
@@ -33,6 +34,7 @@ export const DEFAULT_PROFILE: ProfileData = {
   initial: "?",
   subline: "",
   isImsStudent: false,
+  isSourceCodeAcademia: false,
   activeIntent: "",
   skills: [],
   socialUrls: { ...EMPTY_SOCIAL_URLS },
@@ -210,6 +212,10 @@ function parseProfile(raw: string | null): ProfileData {
         typeof row.isImsStudent === "boolean"
           ? row.isImsStudent
           : DEFAULT_PROFILE.isImsStudent,
+      isSourceCodeAcademia:
+        typeof row.isSourceCodeAcademia === "boolean"
+          ? row.isSourceCodeAcademia
+          : DEFAULT_PROFILE.isSourceCodeAcademia,
       activeIntent:
         typeof row.activeIntent === "string"
           ? row.activeIntent

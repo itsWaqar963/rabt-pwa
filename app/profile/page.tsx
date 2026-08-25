@@ -6,8 +6,10 @@ import { AuthGuard } from "@/components/auth/AuthGuard";
 import { useAuth } from "@/context/AuthContext";
 import { Pencil, Settings } from "lucide-react";
 import { BottomNav } from "@/components/layout/BottomNav";
+import { AffiliationBadges } from "@/components/ui/AffiliationBadges";
 import { DigitalTrailRow } from "@/components/ui/DigitalTrailIcons";
 import { EditProfileModal } from "@/components/ui/EditProfileModal";
+import { PresenceDot } from "@/components/ui/PresenceDot";
 import { ProfileSettingsModal } from "@/components/ui/ProfileSettingsModal";
 import {
   clusterSignalItems,
@@ -199,20 +201,14 @@ export default function ProfilePage() {
                 <h2 className="font-body text-lg font-bold text-foreground">
                   {displayName}
                 </h2>
-                {profile.isImsStudent ? (
-                  <span className="inline-flex items-center gap-1 rounded-full border border-[color-mix(in_oklch,var(--accent)_55%,var(--border))] bg-[color-mix(in_oklch,var(--accent)_12%,transparent)] px-1.5 py-[3px] font-mono text-[8px] uppercase tracking-[0.04em] text-accent shadow-[0_0_14px_color-mix(in_oklch,var(--accent)_35%,transparent)] before:text-[9px] before:content-['✓']">
-                    IMS student
-                  </span>
-                ) : null}
+                <AffiliationBadges
+                  isImsStudent={profile.isImsStudent}
+                  isSourceCodeAcademia={profile.isSourceCodeAcademia}
+                />
               </div>
               <p className="mt-1 text-[11px] text-muted">{profile.subline}</p>
             </div>
-            <span
-              className="size-[9px] rounded-full bg-accent shadow-[0_0_14px_color-mix(in_oklch,var(--accent)_80%,transparent)]"
-              title="Active now"
-              role="img"
-              aria-label="Active now"
-            />
+            <PresenceDot online size="md" />
           </div>
 
           <div className="mt-4 min-h-[60px] border-l-2 border-accent bg-[color-mix(in_oklch,var(--accent)_14%,transparent)] px-3 py-[11px]">
@@ -422,6 +418,10 @@ export default function ProfilePage() {
           <ProfileSettingsModal
             open={settingsOpen}
             onClose={() => setSettingsOpen(false)}
+            profile={profile}
+            onSaveAffiliations={(patch) =>
+              persist({ ...profile, ...patch })
+            }
           />
         </>
       ) : null}

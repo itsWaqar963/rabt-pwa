@@ -179,6 +179,9 @@ export default function DiscoverPage() {
                   cityLabel={getFilterLabel("city", user.city)}
                   countryLabel={getFilterLabel("country", user.country)}
                   meetup={user.meetup}
+                  isImsStudent={user.isImsStudent}
+                  isSourceCodeAcademia={user.isSourceCodeAcademia}
+                  isOnline={user.isOnline === true}
                   primaryAcked={
                     user.meetup
                       ? isMeetupRequested(user.meetup.id)

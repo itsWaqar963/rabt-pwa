@@ -51,6 +51,8 @@ type FormState = {
   skillInput: string;
   socialUrls: SocialUrls;
   introvertExtrovert: number;
+  isImsStudent: boolean;
+  isSourceCodeAcademia: boolean;
   gender: ProfileGender;
   ageGroup: ProfileAgeGroup;
   city: string;
@@ -66,6 +68,8 @@ function toFormState(profile: ProfileData): FormState {
     skillInput: "",
     socialUrls: normalizeSocialUrls(profile.socialUrls),
     introvertExtrovert: profile.introvertExtrovert,
+    isImsStudent: profile.isImsStudent,
+    isSourceCodeAcademia: profile.isSourceCodeAcademia,
     gender: profile.gender,
     ageGroup: profile.ageGroup,
     city: profile.city,
@@ -148,6 +152,8 @@ export function EditProfileModal({
       skills: form.skills,
       socialUrls: trimSocialUrls(form.socialUrls),
       introvertExtrovert: form.introvertExtrovert,
+      isImsStudent: form.isImsStudent,
+      isSourceCodeAcademia: form.isSourceCodeAcademia,
       gender: form.gender,
       ageGroup: form.ageGroup,
       city: form.city,
@@ -482,6 +488,54 @@ export function EditProfileModal({
                   </span>
                 </div>
               </div>
+
+              <fieldset className="rounded-[14px] border border-border bg-[color-mix(in_oklch,var(--surface)_72%,transparent)] p-3.5">
+                <legend className="px-1 font-mono text-[10px] uppercase tracking-[0.08em] text-muted">
+                  Affiliations
+                </legend>
+                <label className="mt-1 flex cursor-pointer items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={form.isImsStudent}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        isImsStudent: event.target.checked,
+                      }))
+                    }
+                    className="mt-0.5 size-4 accent-[var(--accent)]"
+                  />
+                  <span>
+                    <span className="block text-[13px] font-semibold text-foreground">
+                      IMS
+                    </span>
+                    <span className="mt-0.5 block text-[10px] text-muted">
+                      Show verified IMS badge on your card.
+                    </span>
+                  </span>
+                </label>
+                <label className="mt-3 flex cursor-pointer items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={form.isSourceCodeAcademia}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        isSourceCodeAcademia: event.target.checked,
+                      }))
+                    }
+                    className="mt-0.5 size-4 accent-[var(--accent)]"
+                  />
+                  <span>
+                    <span className="block text-[13px] font-semibold text-foreground">
+                      Source Code Academia
+                    </span>
+                    <span className="mt-0.5 block text-[10px] text-muted">
+                      Show verified Source Code Academia badge.
+                    </span>
+                  </span>
+                </label>
+              </fieldset>
               <div className="h-8" aria-hidden />
             </div>
 
