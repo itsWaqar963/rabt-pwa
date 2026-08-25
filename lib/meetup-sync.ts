@@ -12,6 +12,7 @@ import {
   parseProfileAgeGroup,
   parseProfileGender,
 } from "@/lib/profile-store";
+import { withJwtRetry } from "@/lib/auth-retry";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 const HOST_PROFILE_COLS =
@@ -225,12 +226,15 @@ export async function fetchMeetupsWithHosts(): Promise<HostedMeetup[]> {
   if (!isSupabaseConfigured) return [];
 
   try {
-    // host_id FK targets auth.users, not profiles — embed hints 400 without 009_profiles_fk_for_embeds.
-    const { data, error } = await supabase
-      .from("meetups")
-      .select("*")
-      .or("status.eq.open,status.is.null")
-      .order("created_at", { ascending: false });
+    // Plain select + batch profiles (host_id FK → auth.users, not profiles).
+    const { data, error } = await withJwtRetry(async () => {
+      const res = await supabase
+        .from("meetups")
+        .select("*")
+        .or("status.eq.open,status.is.null")
+        .order("created_at", { ascending: false });
+      return { data: res.data, error: res.error };
+    });
 
     if (error) {
       logRemoteError("fetchMeetupsWithHosts", error);

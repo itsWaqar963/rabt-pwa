@@ -102,15 +102,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       void syncAwakeningFromRemote(mapped.id);
     }
 
-    void supabase.auth.getSession().then(({ data: { session } }) => {
+    void (async () => {
+      const { data: sessionData } = await supabase.auth.getSession();
       if (cancelled) return;
+
+      let session = sessionData.session;
+
+      // Prefer a freshly issued JWT — mitigates PGRST303 (JWT issued at future)
+      // when the device clock is slightly ahead of Auth.
+      if (session) {
+        const refreshed = await supabase.auth.refreshSession();
+        if (cancelled) return;
+        if (refreshed.data.session) {
+          session = refreshed.data.session;
+        }
+      }
+
       applySession(session, setUser, setIsAuthenticated);
       setLoading(false);
+
       if (session?.user?.id) {
         void refreshFromGetUser();
         void syncAwakeningFromRemote(session.user.id);
       }
-    });
+    })();
 
     const {
       data: { subscription },

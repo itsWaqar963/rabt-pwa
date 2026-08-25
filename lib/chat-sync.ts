@@ -1,3 +1,8 @@
+import {
+  isJwtClockSkewError,
+  recoverFromJwtClockSkew,
+  withJwtRetry,
+} from "@/lib/auth-retry";
 import { isLocalCreatedMeetupId } from "@/lib/meetup-store";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
@@ -316,11 +321,14 @@ export async function fetchMessages(meetupId: string): Promise<ChatMessage[]> {
   if (!isSupabaseConfigured) return [];
 
   try {
-    const { data, error } = await supabase
-      .from("messages")
-      .select("id, meetup_id, sender_id, body, created_at")
-      .eq("meetup_id", meetupId)
-      .order("created_at", { ascending: true });
+    const { data, error } = await withJwtRetry(async () => {
+      const res = await supabase
+        .from("messages")
+        .select("id, meetup_id, sender_id, body, created_at")
+        .eq("meetup_id", meetupId)
+        .order("created_at", { ascending: true });
+      return { data: res.data, error: res.error };
+    });
 
     if (error) {
       logRemoteError("fetchMessages", error);
@@ -398,10 +406,32 @@ export async function sendMessage(
       body: trimmed,
     };
 
-    const { error: insertError } = await supabase.from("messages").insert(payload);
+    let insertError = (
+      await supabase.from("messages").insert(payload)
+    ).error;
+
+    if (insertError && isJwtClockSkewError(insertError)) {
+      const recovered = await recoverFromJwtClockSkew(insertError);
+      if (recovered) {
+        insertError = (
+          await supabase.from("messages").insert(payload)
+        ).error;
+      }
+    }
 
     if (insertError) {
       logRemoteError("sendMessage.insert", insertError);
+      // 0A000 = leftover sync webhook trigger (extensions.net.http_post)
+      if (
+        insertError.code === "0A000" ||
+        (insertError.message ?? "").includes("http_post")
+      ) {
+        logRemoteError("sendMessage.insert", {
+          code: "WEBHOOK_TRIGGER",
+          message:
+            "messages INSERT blocked by sync HTTP trigger — run migration 011",
+        });
+      }
     }
 
     const row = await fetchOwnMessageRow(meetupKey, senderId, trimmed);

@@ -1,11 +1,12 @@
 -- Drop broken synchronous webhook trigger on messages INSERT.
--- Error seen in client: 0A000 cross-database references are not implemented: extensions.net.http_post
--- That blocks every INSERT into public.messages.
+-- Error: 0A000 cross-database references are not implemented: extensions.net.http_post
 --
--- DO NOT use a row-level pg_net / net.http_post trigger for push.
--- Use instead (pick one):
---   • Supabase Dashboard → Database → Webhooks → messages INSERT → /api/hooks/message-inserted
---   • Client fire-and-forget POST /api/notify-meetup-message after send
+-- Known Dashboard webhook trigger name: "send-push-on-message"
+-- → supabase_functions.http_request() → extensions.net.http_post
+-- Migration 011 drops that trigger (and any similar HTTP triggers).
+--
+-- DO NOT re-create a row-level sync HTTP trigger for push.
+-- Use client POST /api/notify-meetup-message after successful send.
 
 DROP TRIGGER IF EXISTS on_message_inserted_webhook ON public.messages;
 DROP TRIGGER IF EXISTS message_inserted_webhook ON public.messages;
