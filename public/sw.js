@@ -1,10 +1,24 @@
-/* RABT PWA service worker — Web Push + notification deep-link foundation */
+/* RABT PWA service worker — Web Push + notification deep-link
+ * Cache-bust: v3 — always show OS tray on push unless a VISIBLE focused client exists.
+ */
 
 function toAbsoluteUrl(url) {
   if (!url) return self.location.origin + "/meetups";
   if (/^https?:\/\//i.test(url)) return url;
   const path = url.startsWith("/") ? url : "/" + url;
   return self.location.origin + path;
+}
+
+/** Only suppress tray when a client is both focused AND visible (not minimized/background). */
+function isClientActivelyVisible(client) {
+  if (!client || !client.focused) return false;
+  // WindowClient.visibilityState: 'visible' | 'hidden' | 'prerender'
+  // Minimized / backgrounded windows report 'hidden' even if focused was sticky.
+  if (typeof client.visibilityState === "string") {
+    return client.visibilityState === "visible";
+  }
+  // Older browsers without visibilityState — do NOT suppress (fail open → show tray).
+  return false;
 }
 
 self.addEventListener("install", (event) => {
@@ -48,6 +62,7 @@ self.addEventListener("push", (event) => {
       ? "/meetups?chat=" + encodeURIComponent(data.meetupId)
       : "/meetups");
   const url = toAbsoluteUrl(relativeOrAbs);
+  const tag = data.meetupId ? "rabt-chat-" + data.meetupId : "rabt-chat";
 
   event.waitUntil(
     (async () => {
@@ -56,35 +71,35 @@ self.addEventListener("push", (event) => {
         includeUncontrolled: true,
       });
 
-      let hasFocused = false;
+      let activelyViewing = false;
       for (const client of allClients) {
-        if (client.focused) {
-          hasFocused = true;
-          try {
-            client.postMessage({
-              type: "RABT_PUSH_MESSAGE",
-              meetupId: data.meetupId,
-              title: data.title,
-              body: data.body,
-              url,
-            });
-          } catch {
-            /* ignore */
-          }
+        try {
+          client.postMessage({
+            type: "RABT_PUSH_MESSAGE",
+            meetupId: data.meetupId,
+            title: data.title,
+            body: data.body,
+            url,
+          });
+        } catch {
+          /* ignore */
+        }
+        if (isClientActivelyVisible(client)) {
+          activelyViewing = true;
         }
       }
 
-      // Focused tab uses Realtime + in-app toast. Background / closed → OS tray.
-      if (hasFocused) return;
+      // Fail OPEN: minimized / background / closed → always show OS tray.
+      // Only skip when a visible+focused client can show in-app toast instead.
+      if (activelyViewing) return;
 
-      await self.registration.showNotification(data.title, {
-        body: data.body,
+      await self.registration.showNotification(data.title || "RABT", {
+        body: data.body || "New message",
         icon: "/icons/icon-192x192.png",
         badge: "/icons/icon-192x192.png",
-        tag: data.meetupId
-          ? "rabt-chat-" + data.meetupId
-          : "rabt-chat",
+        tag,
         renotify: true,
+        requireInteraction: false,
         data: { url, meetupId: data.meetupId },
       });
     })(),

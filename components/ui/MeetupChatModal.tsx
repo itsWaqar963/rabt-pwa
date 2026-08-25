@@ -25,7 +25,10 @@ import {
   type ChatMessage,
 } from "@/lib/chat-sync";
 import { isAppFocused } from "@/lib/document-focus";
-import { showOsChatNotification } from "@/lib/os-notify";
+import {
+  closeOsChatNotifications,
+  showOsChatNotification,
+} from "@/lib/os-notify";
 import { initialsFromName } from "@/lib/profile-store";
 import { notifyMeetupMessagePush } from "@/lib/push-subscribe";
 
@@ -229,6 +232,7 @@ export function MeetupChatModal({
         const focused = isAppFocused();
         if (focused) {
           playChatSound("pop");
+          void closeOsChatNotifications(meetupId);
         } else {
           showOsChatNotification({
             title: meetupTitle?.trim() || "Meetup chat",

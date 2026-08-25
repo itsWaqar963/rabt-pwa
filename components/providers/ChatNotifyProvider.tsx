@@ -23,7 +23,10 @@ import {
   subscribeMessages,
 } from "@/lib/chat-sync";
 import { isActivelyViewingChat, isAppFocused } from "@/lib/document-focus";
-import { showOsChatNotification } from "@/lib/os-notify";
+import {
+  closeOsChatNotifications,
+  showOsChatNotification,
+} from "@/lib/os-notify";
 
 type ChatToast = {
   messageId: string;
@@ -111,7 +114,10 @@ function ChatInboxListener({
         if (msg.senderId === myId) return;
 
         // User is looking at this chat — modal owns READ + sound.
-        if (isActivelyViewingChat(activeRef.current, id)) return;
+        if (isActivelyViewingChat(activeRef.current, id)) {
+          void closeOsChatNotifications(id);
+          return;
+        }
 
         void broadcastChatAck({
           kind: "ACK_DELIVERED",
@@ -125,8 +131,9 @@ function ChatInboxListener({
 
         if (isAppFocused()) {
           onToastRef.current({ messageId: msg.id, meetupId: id, title });
+          void closeOsChatNotifications(id);
         } else {
-          // Minimized / background tab — in-app toast is invisible.
+          // Minimized / background — force OS tray via SW registration.
           showOsChatNotification({
             title: `New message in ${title}`,
             body: preview,

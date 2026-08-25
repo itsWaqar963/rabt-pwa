@@ -68,6 +68,11 @@ export async function sendPushToSubscription(
       },
     },
     JSON.stringify(payload),
+    {
+      TTL: 60 * 60,
+      urgency: "high",
+      topic: payload.meetupId ? `rabt-${payload.meetupId}`.slice(0, 32) : undefined,
+    },
   );
 }
 
