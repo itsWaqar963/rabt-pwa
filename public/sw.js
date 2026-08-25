@@ -17,7 +17,12 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("push", (event) => {
-  let data = { title: "RABT", body: "New activity", url: undefined, meetupId: undefined };
+  let data = {
+    title: "RABT",
+    body: "New activity",
+    url: undefined,
+    meetupId: undefined,
+  };
   try {
     if (event.data) {
       const parsed = event.data.json();
@@ -39,16 +44,50 @@ self.addEventListener("push", (event) => {
 
   const relativeOrAbs =
     data.url ||
-    (data.meetupId ? "/meetups?chat=" + encodeURIComponent(data.meetupId) : "/meetups");
+    (data.meetupId
+      ? "/meetups?chat=" + encodeURIComponent(data.meetupId)
+      : "/meetups");
   const url = toAbsoluteUrl(relativeOrAbs);
 
   event.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: "/icons/icon-192x192.png",
-      badge: "/icons/icon-192x192.png",
-      data: { url, meetupId: data.meetupId },
-    }),
+    (async () => {
+      const allClients = await self.clients.matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      });
+
+      let hasFocused = false;
+      for (const client of allClients) {
+        if (client.focused) {
+          hasFocused = true;
+          try {
+            client.postMessage({
+              type: "RABT_PUSH_MESSAGE",
+              meetupId: data.meetupId,
+              title: data.title,
+              body: data.body,
+              url,
+            });
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+
+      // Focused tab uses Realtime + in-app toast. Background / closed → OS tray.
+      if (hasFocused) return;
+
+      await self.registration.showNotification(data.title, {
+        body: data.body,
+        icon: "/icons/icon-192x192.png",
+        badge: "/icons/icon-192x192.png",
+        tag: data.meetupId
+          ? "rabt-chat-" + data.meetupId
+          : "rabt-chat",
+        renotify: true,
+        data: { url, meetupId: data.meetupId },
+      });
+    })(),
   );
 });
 

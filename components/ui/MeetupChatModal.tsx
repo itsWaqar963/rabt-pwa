@@ -24,6 +24,8 @@ import {
   subscribeMessages,
   type ChatMessage,
 } from "@/lib/chat-sync";
+import { isAppFocused } from "@/lib/document-focus";
+import { showOsChatNotification } from "@/lib/os-notify";
 import { initialsFromName } from "@/lib/profile-store";
 import { notifyMeetupMessagePush } from "@/lib/push-subscribe";
 
@@ -115,8 +117,8 @@ async function ackPeerMessagesRead(
   myId: string,
   messages: ChatMessage[],
 ): Promise<void> {
+  if (!isAppFocused()) return;
   const peer = messages.filter((m) => m.senderId !== myId);
-  // Cap flood: ACK_READ for all peer msgs on open (typically short threads)
   for (const msg of peer) {
     await broadcastChatAck({
       kind: "ACK_DELIVERED",
@@ -224,7 +226,19 @@ export function MeetupChatModal({
       }
 
       if (myId && msg.senderId !== myId) {
-        playChatSound("pop");
+        const focused = isAppFocused();
+        if (focused) {
+          playChatSound("pop");
+        } else {
+          showOsChatNotification({
+            title: meetupTitle?.trim() || "Meetup chat",
+            body:
+              msg.body.length > 80
+                ? `${msg.body.slice(0, 77)}...`
+                : msg.body,
+            meetupId,
+          });
+        }
         void (async () => {
           await broadcastChatAck({
             kind: "ACK_DELIVERED",
@@ -232,12 +246,15 @@ export function MeetupChatModal({
             messageId: msg.id,
             fromUserId: myId,
           });
-          await broadcastChatAck({
-            kind: "ACK_READ",
-            meetupId,
-            messageId: msg.id,
-            fromUserId: myId,
-          });
+          // READ only when the user can actually see the chat.
+          if (isAppFocused()) {
+            await broadcastChatAck({
+              kind: "ACK_READ",
+              meetupId,
+              messageId: msg.id,
+              fromUserId: myId,
+            });
+          }
         })();
       }
     });
@@ -257,6 +274,31 @@ export function MeetupChatModal({
       unsubAcks();
     };
   }, [open, canChat, meetupId, myId]);
+
+  // When user returns to a focused chat, mark pending peer messages as READ.
+  useEffect(() => {
+    if (!open || !canChat || !meetupId || !myId) return;
+
+    function onVisible() {
+      if (!isAppFocused()) return;
+      const peer = messages.filter((m) => m.senderId !== myId);
+      for (const msg of peer) {
+        void broadcastChatAck({
+          kind: "ACK_READ",
+          meetupId,
+          messageId: msg.id,
+          fromUserId: myId!,
+        });
+      }
+    }
+
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, [open, canChat, meetupId, myId, messages]);
 
   useEffect(() => {
     if (!open) return;

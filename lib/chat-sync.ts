@@ -77,14 +77,104 @@ function ackChannelName(meetupId: string): string {
   return `meetup-acks-${meetupId}`;
 }
 
+/** In-flight ensureAckChannel promises — avoids duplicate subscribe races. */
+const ackChannelEnsuring = new Map<string, Promise<ReturnType<typeof supabase.channel> | null>>();
+
+function findAckChannel(meetupId: string) {
+  const topic = ackChannelName(meetupId);
+  const realtimeTopic = `realtime:${topic}`;
+  return (
+    supabase.getChannels().find((c) => {
+      const t = c.topic;
+      return t === realtimeTopic || t === topic || t.endsWith(`:${topic}`);
+    }) ?? null
+  );
+}
+
+/**
+ * Ensure a joined Realtime broadcast channel for meetup ACKs.
+ * Reuses existing channels; soft-fails (null) instead of throwing on timeout.
+ */
+export async function ensureAckChannel(
+  meetupId: string,
+): Promise<ReturnType<typeof supabase.channel> | null> {
+  if (!isSupabaseConfigured) return null;
+
+  const topic = ackChannelName(meetupId);
+  const existing = findAckChannel(meetupId);
+  if (existing && existing.state === "joined") {
+    return existing;
+  }
+
+  const pending = ackChannelEnsuring.get(topic);
+  if (pending) return pending;
+
+  const ensurePromise = (async () => {
+    try {
+      let channel = findAckChannel(meetupId);
+      if (!channel) {
+        channel = supabase.channel(topic, {
+          config: { broadcast: { self: false } },
+        });
+      }
+
+      if (channel.state === "joined") return channel;
+
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(
+          () => reject(new Error("ack channel subscribe timeout")),
+          5000,
+        );
+
+        // Already joining — poll state instead of double-subscribe.
+        if (channel!.state === "joining") {
+          const iv = setInterval(() => {
+            if (channel!.state === "joined") {
+              clearInterval(iv);
+              clearTimeout(timeout);
+              resolve();
+            } else if (channel!.state === "closed") {
+              clearInterval(iv);
+              clearTimeout(timeout);
+              reject(new Error(channel!.state));
+            }
+          }, 100);
+          return;
+        }
+
+        channel!.subscribe((next) => {
+          if (next === "SUBSCRIBED") {
+            clearTimeout(timeout);
+            resolve();
+          } else if (next === "CHANNEL_ERROR" || next === "TIMED_OUT") {
+            clearTimeout(timeout);
+            reject(new Error(next));
+          }
+        });
+      });
+
+      return channel;
+    } catch (err) {
+      console.warn("[chat-sync] ensureAckChannel soft-fail", formatSyncError(err));
+      return null;
+    } finally {
+      ackChannelEnsuring.delete(topic);
+    }
+  })();
+
+  ackChannelEnsuring.set(topic, ensurePromise);
+  return ensurePromise;
+}
+
 export function subscribeChatAcks(
   meetupId: string,
   onAck: (payload: ChatAckPayload) => void,
 ): () => void {
   if (!isSupabaseConfigured) return () => {};
 
+  const topic = ackChannelName(meetupId);
   const channel = supabase
-    .channel(ackChannelName(meetupId), {
+    .channel(topic, {
       config: { broadcast: { self: false } },
     })
     .on("broadcast", { event: "chat_ack" }, ({ payload }) => {
@@ -117,50 +207,16 @@ export function subscribeChatAcks(
 
 /**
  * Broadcast ACK on `meetup-acks-${meetupId}`.
- * Only reaches online peers subscribed to the same topic.
+ * Reuses joined channel; soft-fails on timeout (never throws to callers).
  */
 export async function broadcastChatAck(
   payload: ChatAckPayload,
 ): Promise<void> {
   if (!isSupabaseConfigured) return;
 
-  const topic = ackChannelName(payload.meetupId);
-  const existing = supabase
-    .getChannels()
-    .find((c) => c.topic === `realtime:${topic}` && c.state === "joined");
-
   try {
-    if (existing) {
-      const result = await existing.send({
-        type: "broadcast",
-        event: "chat_ack",
-        payload,
-      });
-      if (result !== "ok") {
-        logRemoteError("broadcastChatAck.send", result);
-      }
-      return;
-    }
-
-    const channel = supabase.channel(topic, {
-      config: { broadcast: { self: false } },
-    });
-
-    await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(
-        () => reject(new Error("ack channel subscribe timeout")),
-        8000,
-      );
-      channel.subscribe((status) => {
-        if (status === "SUBSCRIBED") {
-          clearTimeout(timeout);
-          resolve();
-        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          clearTimeout(timeout);
-          reject(new Error(status));
-        }
-      });
-    });
+    const channel = await ensureAckChannel(payload.meetupId);
+    if (!channel) return;
 
     const result = await channel.send({
       type: "broadcast",
@@ -168,12 +224,10 @@ export async function broadcastChatAck(
       payload,
     });
     if (result !== "ok") {
-      logRemoteError("broadcastChatAck.send", result);
+      console.warn("[chat-sync] broadcastChatAck.send", result);
     }
-    // Leave channel up so a concurrent subscribeChatAcks can reuse it;
-    // listener cleanup removes via removeChannel.
   } catch (err) {
-    logRemoteError("broadcastChatAck", err);
+    console.warn("[chat-sync] broadcastChatAck", formatSyncError(err));
   }
 }
 

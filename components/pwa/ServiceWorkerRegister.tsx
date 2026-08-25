@@ -5,9 +5,9 @@ import { useAuth } from "@/context/AuthContext";
 import { registerPushSubscription } from "@/lib/push-subscribe";
 
 /**
- * Registers `/sw.js`, soft-requests notification permission on first auth,
+ * Registers `/sw.js`, requests notification permission when authenticated,
  * and posts Web Push subscription to the server when VAPID public key is set.
- * Re-registers on login and when the document becomes visible again.
+ * Re-syncs on login, visibility, and focus (critical for mobile PWA).
  */
 export function ServiceWorkerRegister() {
   const { user } = useAuth();
@@ -20,8 +20,17 @@ export function ServiceWorkerRegister() {
 
     async function syncPush() {
       try {
-        const registration = await navigator.serviceWorker.register("/sw.js");
+        const registration = await navigator.serviceWorker.register("/sw.js", {
+          scope: "/",
+          updateViaCache: "none",
+        });
         if (cancelled) return;
+
+        try {
+          await registration.update();
+        } catch {
+          /* soft-fail */
+        }
 
         if (!user?.id) return;
         if (typeof Notification === "undefined") return;
@@ -35,6 +44,11 @@ export function ServiceWorkerRegister() {
         }
 
         if (cancelled) return;
+        if (Notification.permission !== "granted") {
+          console.info("[pwa] notification permission not granted");
+          return;
+        }
+
         await registerPushSubscription(registration);
       } catch (err) {
         console.info("[pwa] sw register soft-fail", err);
@@ -53,11 +67,22 @@ export function ServiceWorkerRegister() {
         });
     };
 
+    const onFocus = () => {
+      if (!user?.id) return;
+      void navigator.serviceWorker.ready
+        .then((reg) => registerPushSubscription(reg))
+        .catch(() => {
+          /* soft-fail */
+        });
+    };
+
     document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", onFocus);
 
     return () => {
       cancelled = true;
       document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", onFocus);
     };
   }, [user?.id]);
 

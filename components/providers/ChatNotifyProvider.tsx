@@ -17,7 +17,13 @@ import { MessageCircle } from "lucide-react";
 import { useMeetupStore } from "@/components/providers/MeetupStoreProvider";
 import { useAuth } from "@/context/AuthContext";
 import { playChatSound } from "@/lib/chat-sounds";
-import { broadcastChatAck, subscribeMessages } from "@/lib/chat-sync";
+import {
+  broadcastChatAck,
+  subscribeChatAcks,
+  subscribeMessages,
+} from "@/lib/chat-sync";
+import { isActivelyViewingChat, isAppFocused } from "@/lib/document-focus";
+import { showOsChatNotification } from "@/lib/os-notify";
 
 type ChatToast = {
   messageId: string;
@@ -93,11 +99,19 @@ function ChatInboxListener({
   useEffect(() => {
     if (!hydrated || !myId || eligible.length === 0) return;
 
+    // Keep ACK broadcast channels subscribed so ticks don't hit subscribe timeout.
+    const ackUnsubs = eligible.map(({ id }) =>
+      subscribeChatAcks(id, () => {
+        /* inbox only needs the channel joined for outbound ACKs */
+      }),
+    );
+
     const unsubs = eligible.map(({ id, title }) =>
       subscribeMessages(id, (msg) => {
         if (msg.senderId === myId) return;
-        // Modal open for this meetup handles DELIVERED + READ itself
-        if (activeRef.current === id) return;
+
+        // User is looking at this chat — modal owns READ + sound.
+        if (isActivelyViewingChat(activeRef.current, id)) return;
 
         void broadcastChatAck({
           kind: "ACK_DELIVERED",
@@ -106,12 +120,25 @@ function ChatInboxListener({
           fromUserId: myId,
         });
 
-        onToastRef.current({ messageId: msg.id, meetupId: id, title });
+        const preview =
+          msg.body.length > 80 ? `${msg.body.slice(0, 77)}...` : msg.body;
+
+        if (isAppFocused()) {
+          onToastRef.current({ messageId: msg.id, meetupId: id, title });
+        } else {
+          // Minimized / background tab — in-app toast is invisible.
+          showOsChatNotification({
+            title: `New message in ${title}`,
+            body: preview,
+            meetupId: id,
+          });
+        }
       }),
     );
 
     return () => {
       for (const unsub of unsubs) unsub();
+      for (const unsub of ackUnsubs) unsub();
     };
     // eligibleKey captures membership; titles refresh with eligible array rebuild
     // eslint-disable-next-line react-hooks/exhaustive-deps -- subscribe by id set
