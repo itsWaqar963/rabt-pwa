@@ -1,9 +1,9 @@
 /* RABT PWA service worker — Web Push + notification deep-link
- * Cache-bust: v4 — always show OS tray; unique tags; monochrome badge.
+ * Cache-bust: v5 — refreshed PWA / notify / badge icons.
  */
 
-const NOTIFY_ICON = "/icons/notify-icon-192.png?v=4";
-const NOTIFY_BADGE = "/icons/badge-96x96.png?v=4";
+const NOTIFY_ICON = "/icons/notify-icon-192.png?v=5";
+const NOTIFY_BADGE = "/icons/badge-96x96.png?v=5";
 
 function toAbsoluteUrl(url) {
   if (!url) return self.location.origin + "/meetups";

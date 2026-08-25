@@ -4,8 +4,8 @@
  * throttled/hidden; `new Notification()` is often blocked in background tabs.
  */
 
-const NOTIFY_ICON = "/icons/notify-icon-192.png?v=4";
-const NOTIFY_BADGE = "/icons/badge-96x96.png?v=4";
+const NOTIFY_ICON = "/icons/notify-icon-192.png?v=5";
+const NOTIFY_BADGE = "/icons/badge-96x96.png?v=5";
 
 export function canShowOsNotification(): boolean {
   if (typeof window === "undefined") return false;

@@ -28,11 +28,11 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/icons/icon-192x192.png?v=2", sizes: "192x192", type: "image/png" },
-      { url: "/icons/icon-512x512.png?v=2", sizes: "512x512", type: "image/png" },
+      { url: "/icons/icon-192x192.png?v=5", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512x512.png?v=5", sizes: "512x512", type: "image/png" },
     ],
     apple: {
-      url: "/icons/icon-192x192.png?v=2",
+      url: "/icons/icon-192x192.png?v=5",
       sizes: "192x192",
       type: "image/png",
     },
