@@ -1,9 +1,6 @@
 /* RABT PWA service worker — Web Push + notification deep-link
- * Cache-bust: v5 — refreshed PWA / notify / badge icons.
+ * Cache-bust: v6 — absolute notify icons + fail-open showNotification.
  */
-
-const NOTIFY_ICON = "/icons/notify-icon-192.png?v=5";
-const NOTIFY_BADGE = "/icons/badge-96x96.png?v=5";
 
 function toAbsoluteUrl(url) {
   if (!url) return self.location.origin + "/meetups";
@@ -11,6 +8,9 @@ function toAbsoluteUrl(url) {
   const path = url.startsWith("/") ? url : "/" + url;
   return self.location.origin + path;
 }
+
+const NOTIFY_ICON = toAbsoluteUrl("/icons/notify-icon-192.png");
+const NOTIFY_BADGE = toAbsoluteUrl("/icons/badge-96x96.png");
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
@@ -84,21 +84,40 @@ self.addEventListener("push", (event) => {
         }
       }
 
-      // Always show OS tray on push (reliability). Focused clients get in-app
-      // toast via postMessage and may close matching notifications.
-      await self.registration.showNotification(data.title || "RABT", {
-        body: data.body || "New message",
-        icon: NOTIFY_ICON,
-        badge: NOTIFY_BADGE,
-        tag,
-        renotify: true,
-        requireInteraction: false,
-        data: {
-          url,
-          meetupId: data.meetupId,
-          messageId: data.messageId,
-        },
-      });
+      const payload = {
+        url,
+        meetupId: data.meetupId,
+        messageId: data.messageId,
+      };
+      const title = data.title || "RABT";
+      const body = data.body || "New message";
+
+      // Always show OS tray on push (reliability). Fail open: retry without
+      // icon/badge if asset URLs break showNotification on some Android.
+      try {
+        await self.registration.showNotification(title, {
+          body,
+          icon: NOTIFY_ICON,
+          badge: NOTIFY_BADGE,
+          tag,
+          renotify: true,
+          requireInteraction: false,
+          data: payload,
+        });
+      } catch (err) {
+        console.info("[sw] showNotification with icons failed, retry plain", err);
+        try {
+          await self.registration.showNotification(title, {
+            body,
+            tag,
+            renotify: true,
+            requireInteraction: false,
+            data: payload,
+          });
+        } catch (err2) {
+          console.info("[sw] showNotification plain soft-fail", err2);
+        }
+      }
     })(),
   );
 });

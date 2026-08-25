@@ -1,19 +1,48 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { resolveAwakeningComplete } from "@/lib/awakening-store";
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
   const router = useRouter();
+  const [awakeningOk, setAwakeningOk] = useState(false);
 
   useEffect(() => {
     if (loading) return;
-    if (!isAuthenticated) {
-      router.replace("/welcome");
+
+    let cancelled = false;
+
+    async function gate() {
+      if (!isAuthenticated) {
+        router.replace("/welcome");
+        if (!cancelled) setAwakeningOk(false);
+        return;
+      }
+
+      if (!user?.id) {
+        if (!cancelled) setAwakeningOk(true);
+        return;
+      }
+
+      const done = await resolveAwakeningComplete(user.id);
+      if (cancelled) return;
+      if (!done) {
+        setAwakeningOk(false);
+        router.replace("/");
+        return;
+      }
+      setAwakeningOk(true);
     }
-  }, [isAuthenticated, loading, router]);
+
+    void gate();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, loading, router, user?.id]);
 
   if (loading) {
     return (
@@ -27,6 +56,17 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   }
 
   if (!isAuthenticated) return null;
+
+  if (!awakeningOk) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ background: "var(--bg)" }}
+        aria-busy="true"
+        aria-label="Loading"
+      />
+    );
+  }
 
   return <>{children}</>;
 }

@@ -4,98 +4,137 @@ import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Bell, BellOff, X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { isVapidPublicConfigured, registerPushSubscription } from "@/lib/push-subscribe";
+import {
+  hasPushSubscription,
+  isVapidPublicConfigured,
+  registerPushSubscription,
+} from "@/lib/push-subscribe";
 
-const DISMISS_KEY = "rabt_notify_banner_dismissed";
+/** Session-only dismiss — permanent dismiss only after granted + subscribe. */
+const SESSION_DISMISS_KEY = "rabt_notify_banner_session_dismissed";
 const EASE = [0.22, 1, 0.36, 1] as const;
 
 type Perm = NotificationPermission | "unsupported";
 
-function readDismissed(): boolean {
+function readSessionDismissed(): boolean {
   try {
-    return localStorage.getItem(DISMISS_KEY) === "true";
+    return sessionStorage.getItem(SESSION_DISMISS_KEY) === "true";
   } catch {
     return false;
   }
 }
 
-function writeDismissed(): void {
+function writeSessionDismissed(): void {
   try {
-    localStorage.setItem(DISMISS_KEY, "true");
+    sessionStorage.setItem(SESSION_DISMISS_KEY, "true");
   } catch {
-    /* quota */
+    /* quota / private */
   }
 }
 
 /**
- * Soft in-app invite to enable notifications when permission is not granted.
+ * Soft in-app invite to enable notifications when permission is not granted,
+ * or when granted but PushSubscription is missing (e.g. after reinstall —
+ * OS may show "Managed by RABT" while push endpoint is gone).
  * Does not call requestPermission on mount (that permanently blocks without gesture).
  */
 export function NotificationPermissionBanner() {
   const { user, isAuthenticated } = useAuth();
   const reducedMotion = useReducedMotion();
   const [perm, setPerm] = useState<Perm>("default");
-  const [dismissed, setDismissed] = useState(true);
+  const [hasSub, setHasSub] = useState(true);
+  const [sessionDismissed, setSessionDismissed] = useState(true);
   const [busy, setBusy] = useState(false);
 
-  const refreshPerm = useCallback(() => {
+  const refreshStatus = useCallback(async () => {
     if (typeof Notification === "undefined") {
       setPerm("unsupported");
+      setHasSub(false);
       return;
     }
-    setPerm(Notification.permission);
+    const permission = Notification.permission;
+    setPerm(permission);
+    if (permission === "granted" && "serviceWorker" in navigator) {
+      const sub = await hasPushSubscription();
+      setHasSub(sub);
+    } else {
+      setHasSub(false);
+    }
   }, []);
 
   useEffect(() => {
-    setDismissed(readDismissed());
-    refreshPerm();
+    setSessionDismissed(readSessionDismissed());
+    void refreshStatus();
 
-    // Re-check when returning from browser settings.
     const onVis = () => {
-      if (document.visibilityState === "visible") refreshPerm();
+      if (document.visibilityState === "visible") void refreshStatus();
     };
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
-  }, [refreshPerm]);
+  }, [refreshStatus, user?.id]);
+
+  const needsAttention =
+    perm === "default" ||
+    perm === "denied" ||
+    (perm === "granted" && !hasSub);
 
   const show =
     isAuthenticated &&
     Boolean(user?.id) &&
     isVapidPublicConfigured() &&
-    !dismissed &&
-    perm !== "granted" &&
-    perm !== "unsupported";
+    !sessionDismissed &&
+    needsAttention;
 
   const isBlocked = perm === "denied";
+  const needsResub = perm === "granted" && !hasSub;
 
   const onEnable = useCallback(async () => {
     if (busy || typeof Notification === "undefined") return;
     setBusy(true);
     try {
       if (Notification.permission === "denied") {
-        // Cannot re-prompt — leave banner with settings hint.
-        refreshPerm();
+        await refreshStatus();
         return;
       }
-      const result = await Notification.requestPermission();
+
+      let result: NotificationPermission = Notification.permission;
+      if (result !== "granted") {
+        result = await Notification.requestPermission();
+      }
       setPerm(result);
+
       if (result === "granted" && "serviceWorker" in navigator) {
         const reg = await navigator.serviceWorker.ready;
-        await registerPushSubscription(reg);
-        writeDismissed();
-        setDismissed(true);
+        const ok = await registerPushSubscription(reg);
+        setHasSub(ok);
+        if (ok) {
+          setSessionDismissed(true);
+        }
       }
     } catch (err) {
       console.info("[notify-banner] enable soft-fail", err);
     } finally {
       setBusy(false);
     }
-  }, [busy, refreshPerm]);
+  }, [busy, refreshStatus]);
 
   const onDismiss = useCallback(() => {
-    writeDismissed();
-    setDismissed(true);
+    writeSessionDismissed();
+    setSessionDismissed(true);
   }, []);
+
+  let title = "Enable message alerts";
+  let body =
+    "Get notified when meetup chat messages arrive, even if the app is minimized.";
+  if (isBlocked) {
+    title = "Notifications are blocked for RABT";
+    body =
+      "Tap the lock icon in the address bar → Site settings → Notifications → Allow, then reload.";
+  } else if (needsResub) {
+    title = "Re-enable message alerts";
+    body =
+      "Permission looks allowed, but push delivery is not set up yet. Tap Enable to finish.";
+  }
 
   return (
     <AnimatePresence>
@@ -126,15 +165,9 @@ export function NotificationPermissionBanner() {
             )}
             <div className="min-w-0 flex-1">
               <p className="text-[11px] font-medium leading-snug text-foreground">
-                {isBlocked
-                  ? "Notifications are blocked for RABT"
-                  : "Enable message alerts"}
+                {title}
               </p>
-              <p className="mt-0.5 text-[10px] leading-snug text-muted">
-                {isBlocked
-                  ? "Tap the lock icon in the address bar → Site settings → Notifications → Allow, then reload."
-                  : "Get notified when meetup chat messages arrive, even if the app is minimized."}
-              </p>
+              <p className="mt-0.5 text-[10px] leading-snug text-muted">{body}</p>
               {!isBlocked ? (
                 <button
                   type="button"

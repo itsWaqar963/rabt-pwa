@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { resolveAwakeningComplete } from "@/lib/awakening-store";
 import { supabase } from "@/lib/supabase";
 
 export default function AuthCallbackPage() {
@@ -32,9 +33,12 @@ export default function AuthCallbackPage() {
           return;
         }
 
+        let userId: string | undefined;
+
         if (code) {
-          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          const { data, error } = await supabase.auth.exchangeCodeForSession(code);
           if (error) throw error;
+          userId = data.session?.user?.id;
         } else {
           // Implicit / magic-link hash tokens: client auto-detects on getSession
           const { data, error } = await supabase.auth.getSession();
@@ -46,11 +50,19 @@ export default function AuthCallbackPage() {
             if (!again.data.session) {
               throw new Error("No session found in callback URL");
             }
+            userId = again.data.session.user.id;
+          } else {
+            userId = data.session.user.id;
           }
         }
 
         if (!cancelled) {
-          router.replace("/discover");
+          if (userId) {
+            const done = await resolveAwakeningComplete(userId);
+            router.replace(done ? "/discover" : "/");
+          } else {
+            router.replace("/");
+          }
         }
       } catch (err) {
         const msg =

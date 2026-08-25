@@ -1,12 +1,17 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { LogOut, X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import type { ProfileData } from "@/lib/profile-store";
+import {
+  hasPushSubscription,
+  isVapidPublicConfigured,
+  registerPushSubscription,
+} from "@/lib/push-subscribe";
 
 export type ProfileSettingsModalProps = {
   open: boolean;
@@ -24,8 +29,8 @@ const PREFERENCES: { key: PreferenceKey; label: string; description: string }[] 
   [
     {
       key: "notifications",
-      label: "Push notifications",
-      description: "Alerts for connect requests and meetup updates.",
+      label: "Enable notifications",
+      description: "OS alerts for meetup chat when the app is in the background.",
     },
     {
       key: "meetupReminders",
@@ -51,8 +56,9 @@ export function ProfileSettingsModal({
   const { logout } = useAuth();
   const [shell, setShell] = useState<HTMLElement | null>(null);
   const [signingOut, setSigningOut] = useState(false);
+  const [notifyBusy, setNotifyBusy] = useState(false);
   const [prefs, setPrefs] = useState<Record<PreferenceKey, boolean>>({
-    notifications: true,
+    notifications: false,
     meetupReminders: true,
     profileVisible: true,
   });
@@ -63,6 +69,19 @@ export function ProfileSettingsModal({
     profile?.isSourceCodeAcademia ?? false,
   );
 
+  const syncNotificationPref = useCallback(async () => {
+    if (typeof Notification === "undefined" || !isVapidPublicConfigured()) {
+      setPrefs((prev) => ({ ...prev, notifications: false }));
+      return;
+    }
+    if (Notification.permission !== "granted") {
+      setPrefs((prev) => ({ ...prev, notifications: false }));
+      return;
+    }
+    const sub = await hasPushSubscription();
+    setPrefs((prev) => ({ ...prev, notifications: sub }));
+  }, []);
+
   async function handleLogout() {
     setSigningOut(true);
     try {
@@ -71,6 +90,52 @@ export function ProfileSettingsModal({
       router.replace("/welcome");
     } finally {
       setSigningOut(false);
+    }
+  }
+
+  async function handleNotificationToggle() {
+    if (notifyBusy || typeof Notification === "undefined") return;
+    if (!isVapidPublicConfigured()) return;
+
+    if (prefs.notifications) {
+      setNotifyBusy(true);
+      try {
+        if ("serviceWorker" in navigator) {
+          const reg = await navigator.serviceWorker.ready;
+          const sub = await reg.pushManager?.getSubscription();
+          if (sub) await sub.unsubscribe();
+        }
+        setPrefs((prev) => ({ ...prev, notifications: false }));
+      } catch (err) {
+        console.info("[settings] push unsubscribe soft-fail", err);
+      } finally {
+        setNotifyBusy(false);
+      }
+      return;
+    }
+
+    setNotifyBusy(true);
+    try {
+      if (Notification.permission === "denied") {
+        setPrefs((prev) => ({ ...prev, notifications: false }));
+        return;
+      }
+      let result: NotificationPermission = Notification.permission;
+      if (result !== "granted") {
+        result = await Notification.requestPermission();
+      }
+      if (result !== "granted" || !("serviceWorker" in navigator)) {
+        setPrefs((prev) => ({ ...prev, notifications: false }));
+        return;
+      }
+      const reg = await navigator.serviceWorker.ready;
+      const ok = await registerPushSubscription(reg);
+      setPrefs((prev) => ({ ...prev, notifications: ok }));
+    } catch (err) {
+      console.info("[settings] enable notifications soft-fail", err);
+      setPrefs((prev) => ({ ...prev, notifications: false }));
+    } finally {
+      setNotifyBusy(false);
     }
   }
 
@@ -85,6 +150,11 @@ export function ProfileSettingsModal({
     setIsImsStudent(profile.isImsStudent);
     setIsSourceCodeAcademia(profile.isSourceCodeAcademia);
   }, [open, profile]);
+
+  useEffect(() => {
+    if (!open) return;
+    void syncNotificationPref();
+  }, [open, syncNotificationPref]);
 
   useEffect(() => {
     if (!open) return;
@@ -113,6 +183,25 @@ export function ProfileSettingsModal({
       isImsStudent: nextIms,
       isSourceCodeAcademia: nextSca,
     });
+  }
+
+  function onPrefClick(key: PreferenceKey) {
+    switch (key) {
+      case "notifications":
+        void handleNotificationToggle();
+        return;
+      case "meetupReminders":
+      case "profileVisible":
+        setPrefs((prev) => ({
+          ...prev,
+          [key]: !prev[key],
+        }));
+        return;
+      default: {
+        const _exhaustive: never = key;
+        return _exhaustive;
+      }
+    }
   }
 
   return createPortal(
@@ -171,8 +260,8 @@ export function ProfileSettingsModal({
 
             <div className="min-h-0 flex-1 overflow-y-auto px-[22px] [scrollbar-width:thin]">
               <p className="mt-3 text-xs leading-[1.5] text-muted">
-                Account preferences — notification toggles are placeholders for
-                a future sync layer.
+                Enable notifications uses a user gesture so the browser can show
+                its permission prompt.
               </p>
 
               {onSaveAffiliations ? (
@@ -234,7 +323,11 @@ export function ProfileSettingsModal({
                         {pref.label}
                       </p>
                       <p className="mt-0.5 text-[11px] leading-[1.45] text-muted">
-                        {pref.description}
+                        {pref.key === "notifications" &&
+                        typeof Notification !== "undefined" &&
+                        Notification.permission === "denied"
+                          ? "Blocked in browser settings — allow notifications for this site, then toggle again."
+                          : pref.description}
                       </p>
                     </div>
                     <button
@@ -242,13 +335,9 @@ export function ProfileSettingsModal({
                       role="switch"
                       aria-checked={prefs[pref.key]}
                       aria-label={pref.label}
-                      onClick={() =>
-                        setPrefs((prev) => ({
-                          ...prev,
-                          [pref.key]: !prev[pref.key],
-                        }))
-                      }
-                      className={`relative mt-0.5 h-6 w-11 shrink-0 rounded-full border transition-[background,border-color] duration-200 ${
+                      disabled={pref.key === "notifications" && notifyBusy}
+                      onClick={() => onPrefClick(pref.key)}
+                      className={`relative mt-0.5 h-6 w-11 shrink-0 rounded-full border transition-[background,border-color] duration-200 disabled:opacity-50 ${
                         prefs[pref.key]
                           ? "border-[color-mix(in_oklch,var(--accent)_55%,var(--border))] bg-[color-mix(in_oklch,var(--accent)_28%,transparent)]"
                           : "border-border bg-black/30"

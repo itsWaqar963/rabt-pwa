@@ -16,7 +16,7 @@ import { useAuth } from "@/context/AuthContext";
 import {
   isAwakeningCompleteLocal,
   markAwakeningComplete,
-  syncAwakeningFromRemote,
+  resolveAwakeningComplete,
 } from "@/lib/awakening-store";
 
 type ModalMode = "discover" | "retry";
@@ -39,18 +39,22 @@ export default function Home() {
     let cancelled = false;
 
     async function resolveGate() {
-      if (isAwakeningCompleteLocal()) {
-        router.replace("/discover");
-        return;
-      }
-
+      // Authenticated: only THIS userId local/remote — never legacy global.
       if (user?.id) {
-        const remoteDone = await syncAwakeningFromRemote(user.id);
+        const done = await resolveAwakeningComplete(user.id);
         if (cancelled) return;
-        if (remoteDone) {
+        if (done) {
           router.replace("/discover");
           return;
         }
+        setGateReady(true);
+        return;
+      }
+
+      // Pre-auth: guest/legacy local only (does not unlock post-login for new users).
+      if (isAwakeningCompleteLocal(null)) {
+        router.replace("/discover");
+        return;
       }
 
       if (!cancelled) setGateReady(true);
@@ -140,7 +144,7 @@ export default function Home() {
   return (
     <>
       <SplashScreen
-        done={isAwakeningCompleteLocal()}
+        done={isAwakeningCompleteLocal(user?.id ?? null)}
         onComplete={() => setSplashDone(true)}
       />
 

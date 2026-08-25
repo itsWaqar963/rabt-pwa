@@ -17,18 +17,37 @@ export function isVapidPublicConfigured(): boolean {
   return Boolean(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim());
 }
 
+/** True when PushManager already has an active subscription. */
+export async function hasPushSubscription(
+  registration?: ServiceWorkerRegistration | null,
+): Promise<boolean> {
+  try {
+    const reg =
+      registration ??
+      (typeof navigator !== "undefined" && "serviceWorker" in navigator
+        ? await navigator.serviceWorker.ready
+        : null);
+    if (!reg?.pushManager) return false;
+    const sub = await reg.pushManager.getSubscription();
+    return Boolean(sub?.endpoint);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Subscribe via PushManager and POST subscription to /api/push-subscribe.
+ * Returns true when a PushSubscription exists (created or reused).
  */
 export async function registerPushSubscription(
   registration: ServiceWorkerRegistration,
-): Promise<void> {
-  if (!registration.pushManager) return;
-  if (typeof Notification === "undefined") return;
-  if (Notification.permission !== "granted") return;
+): Promise<boolean> {
+  if (!registration.pushManager) return false;
+  if (typeof Notification === "undefined") return false;
+  if (Notification.permission !== "granted") return false;
 
   const vapid = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim();
-  if (!vapid) return;
+  if (!vapid) return false;
 
   try {
     let sub = await registration.pushManager.getSubscription();
@@ -46,11 +65,11 @@ export async function registerPushSubscription(
       /* quota / private mode */
     }
 
-    if (!isSupabaseConfigured) return;
+    if (!isSupabaseConfigured) return Boolean(json.endpoint);
 
     const { data } = await supabase.auth.getSession();
     const token = data.session?.access_token;
-    if (!token || !json.endpoint) return;
+    if (!token || !json.endpoint) return Boolean(json.endpoint);
 
     const res = await fetch("/api/push-subscribe", {
       method: "POST",
@@ -64,8 +83,11 @@ export async function registerPushSubscription(
     if (!res.ok) {
       console.info("[pwa] push-subscribe API soft-fail", res.status);
     }
+
+    return Boolean(json.endpoint);
   } catch (err) {
     console.info("[pwa] push subscribe soft-fail", err);
+    return false;
   }
 }
 
