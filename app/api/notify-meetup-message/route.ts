@@ -13,6 +13,7 @@ type NotifyBody = {
   title?: string;
   body?: string;
   url?: string;
+  messageId?: string;
 };
 
 /**
@@ -41,6 +42,7 @@ export async function POST(req: NextRequest) {
     const meetupId = body.meetupId?.trim();
     const title = body.title?.trim() || "RABT";
     const text = body.body?.trim();
+    const messageId = body.messageId?.trim() || undefined;
     if (!meetupId || !text) {
       return NextResponse.json(
         { error: "meetupId and body required" },
@@ -66,6 +68,7 @@ export async function POST(req: NextRequest) {
         body: text,
         url,
         meetupId,
+        messageId,
       });
       sent += result.sent;
       failed += result.failed;

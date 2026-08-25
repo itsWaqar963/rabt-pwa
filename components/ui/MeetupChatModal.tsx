@@ -241,6 +241,7 @@ export function MeetupChatModal({
                 ? `${msg.body.slice(0, 77)}...`
                 : msg.body,
             meetupId,
+            messageId: msg.id,
           });
         }
         void (async () => {
@@ -337,6 +338,7 @@ export function MeetupChatModal({
           title: meetupTitle?.trim() || "RABT",
           body: body.length > 80 ? `${body.slice(0, 77)}...` : body,
           url: `/meetups?chat=${encodeURIComponent(meetupId)}`,
+          messageId: created.id,
         });
       } else {
         setDraft(body);

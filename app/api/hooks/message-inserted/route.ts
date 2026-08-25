@@ -67,6 +67,7 @@ export async function POST(req: NextRequest) {
     const meetupId = record?.meetup_id?.trim();
     const senderId = record?.sender_id?.trim();
     const text = record?.body?.trim();
+    const messageId = record?.id?.trim() || undefined;
 
     if (!meetupId || !senderId || !text) {
       console.error("[hooks/message-inserted] missing fields", {
@@ -105,6 +106,7 @@ export async function POST(req: NextRequest) {
         body: preview,
         url,
         meetupId,
+        messageId,
       });
       sent += result.sent;
       failed += result.failed;

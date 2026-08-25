@@ -57,7 +57,13 @@ export async function fetchMeetupTitle(meetupId: string): Promise<string> {
 
 export async function sendPushToUser(
   userId: string,
-  payload: { title: string; body: string; url?: string; meetupId?: string },
+  payload: {
+    title: string;
+    body: string;
+    url?: string;
+    meetupId?: string;
+    messageId?: string;
+  },
 ): Promise<{ sent: number; failed: number }> {
   try {
     const admin = getSupabaseAdmin();

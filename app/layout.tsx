@@ -5,6 +5,7 @@ import { GlobalMeetupChatHost } from "@/components/providers/GlobalMeetupChatHos
 import { MeetupStoreProvider } from "@/components/providers/MeetupStoreProvider";
 import { ServiceWorkerRegister } from "@/components/pwa/ServiceWorkerRegister";
 import { InstallPrompt } from "@/components/ui/InstallPrompt";
+import { NotificationPermissionBanner } from "@/components/ui/NotificationPermissionBanner";
 import { OfflineBanner } from "@/components/ui/OfflineBanner";
 import "./globals.css";
 
@@ -51,6 +52,7 @@ export default function RootLayout({
               <ChatNotifyProvider>
                 <ServiceWorkerRegister />
                 <OfflineBanner />
+                <NotificationPermissionBanner />
                 {children}
                 <GlobalMeetupChatHost />
                 <InstallPrompt />

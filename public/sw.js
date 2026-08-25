@@ -1,24 +1,15 @@
 /* RABT PWA service worker — Web Push + notification deep-link
- * Cache-bust: v3 — always show OS tray on push unless a VISIBLE focused client exists.
+ * Cache-bust: v4 — always show OS tray; unique tags; monochrome badge.
  */
+
+const NOTIFY_ICON = "/icons/notify-icon-192.png?v=4";
+const NOTIFY_BADGE = "/icons/badge-96x96.png?v=4";
 
 function toAbsoluteUrl(url) {
   if (!url) return self.location.origin + "/meetups";
   if (/^https?:\/\//i.test(url)) return url;
   const path = url.startsWith("/") ? url : "/" + url;
   return self.location.origin + path;
-}
-
-/** Only suppress tray when a client is both focused AND visible (not minimized/background). */
-function isClientActivelyVisible(client) {
-  if (!client || !client.focused) return false;
-  // WindowClient.visibilityState: 'visible' | 'hidden' | 'prerender'
-  // Minimized / backgrounded windows report 'hidden' even if focused was sticky.
-  if (typeof client.visibilityState === "string") {
-    return client.visibilityState === "visible";
-  }
-  // Older browsers without visibilityState — do NOT suppress (fail open → show tray).
-  return false;
 }
 
 self.addEventListener("install", (event) => {
@@ -36,6 +27,7 @@ self.addEventListener("push", (event) => {
     body: "New activity",
     url: undefined,
     meetupId: undefined,
+    messageId: undefined,
   };
   try {
     if (event.data) {
@@ -45,6 +37,7 @@ self.addEventListener("push", (event) => {
         body: parsed.body || "",
         url: parsed.url,
         meetupId: parsed.meetupId,
+        messageId: parsed.messageId,
       };
     }
   } catch {
@@ -62,7 +55,12 @@ self.addEventListener("push", (event) => {
       ? "/meetups?chat=" + encodeURIComponent(data.meetupId)
       : "/meetups");
   const url = toAbsoluteUrl(relativeOrAbs);
-  const tag = data.meetupId ? "rabt-chat-" + data.meetupId : "rabt-chat";
+  // Unique tag per message — never collapse consecutive pushes for same meetup.
+  const tag =
+    "rabt-chat-" +
+    (data.messageId
+      ? data.messageId
+      : (data.meetupId || "evt") + "-" + Date.now());
 
   event.waitUntil(
     (async () => {
@@ -71,12 +69,12 @@ self.addEventListener("push", (event) => {
         includeUncontrolled: true,
       });
 
-      let activelyViewing = false;
       for (const client of allClients) {
         try {
           client.postMessage({
             type: "RABT_PUSH_MESSAGE",
             meetupId: data.meetupId,
+            messageId: data.messageId,
             title: data.title,
             body: data.body,
             url,
@@ -84,23 +82,22 @@ self.addEventListener("push", (event) => {
         } catch {
           /* ignore */
         }
-        if (isClientActivelyVisible(client)) {
-          activelyViewing = true;
-        }
       }
 
-      // Fail OPEN: minimized / background / closed → always show OS tray.
-      // Only skip when a visible+focused client can show in-app toast instead.
-      if (activelyViewing) return;
-
+      // Always show OS tray on push (reliability). Focused clients get in-app
+      // toast via postMessage and may close matching notifications.
       await self.registration.showNotification(data.title || "RABT", {
         body: data.body || "New message",
-        icon: "/icons/icon-192x192.png",
-        badge: "/icons/icon-192x192.png",
+        icon: NOTIFY_ICON,
+        badge: NOTIFY_BADGE,
         tag,
         renotify: true,
         requireInteraction: false,
-        data: { url, meetupId: data.meetupId },
+        data: {
+          url,
+          meetupId: data.meetupId,
+          messageId: data.messageId,
+        },
       });
     })(),
   );

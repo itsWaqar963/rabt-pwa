@@ -5,6 +5,8 @@ export type PushPayload = {
   body: string;
   url?: string;
   meetupId?: string;
+  /** Unique per message — SW uses for notification tag (avoids collapse). */
+  messageId?: string;
 };
 
 export type PushSubscriptionJSON = {
@@ -69,9 +71,9 @@ export async function sendPushToSubscription(
     },
     JSON.stringify(payload),
     {
+      // No `topic` — FCM/web-push topic collapses consecutive pushes per key.
       TTL: 60 * 60,
       urgency: "high",
-      topic: payload.meetupId ? `rabt-${payload.meetupId}`.slice(0, 32) : undefined,
     },
   );
 }

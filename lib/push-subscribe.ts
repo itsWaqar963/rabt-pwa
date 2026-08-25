@@ -77,6 +77,7 @@ export async function notifyMeetupMessagePush(opts: {
   title: string;
   body: string;
   url?: string;
+  messageId?: string;
 }): Promise<void> {
   if (!isVapidPublicConfigured() || !isSupabaseConfigured) return;
 
@@ -96,6 +97,7 @@ export async function notifyMeetupMessagePush(opts: {
         title: opts.title,
         body: opts.body,
         url: opts.url ?? `/meetups?chat=${encodeURIComponent(opts.meetupId)}`,
+        messageId: opts.messageId,
       }),
     })
       .then((res) => {

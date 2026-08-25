@@ -5,9 +5,9 @@ import { useAuth } from "@/context/AuthContext";
 import { registerPushSubscription } from "@/lib/push-subscribe";
 
 /**
- * Registers `/sw.js`, requests notification permission when authenticated,
- * and posts Web Push subscription to the server when VAPID public key is set.
- * Re-syncs on login, visibility, and focus (critical for mobile PWA).
+ * Registers `/sw.js` and syncs Web Push subscription when permission is already
+ * granted. Does NOT call requestPermission (that must be user-gesture via
+ * NotificationPermissionBanner — auto-prompt causes permanent browser block).
  */
 export function ServiceWorkerRegister() {
   const { user } = useAuth();
@@ -35,15 +35,6 @@ export function ServiceWorkerRegister() {
         if (!user?.id) return;
         if (typeof Notification === "undefined") return;
 
-        if (Notification.permission === "default") {
-          try {
-            await Notification.requestPermission();
-          } catch {
-            /* soft-fail */
-          }
-        }
-
-        if (cancelled) return;
         if (Notification.permission !== "granted") {
           console.info("[pwa] notification permission not granted");
           return;
@@ -60,6 +51,8 @@ export function ServiceWorkerRegister() {
     const onVisibility = () => {
       if (document.visibilityState !== "visible") return;
       if (!user?.id) return;
+      if (typeof Notification === "undefined") return;
+      if (Notification.permission !== "granted") return;
       void navigator.serviceWorker.ready
         .then((reg) => registerPushSubscription(reg))
         .catch((err) => {
@@ -69,6 +62,8 @@ export function ServiceWorkerRegister() {
 
     const onFocus = () => {
       if (!user?.id) return;
+      if (typeof Notification === "undefined") return;
+      if (Notification.permission !== "granted") return;
       void navigator.serviceWorker.ready
         .then((reg) => registerPushSubscription(reg))
         .catch(() => {

@@ -138,6 +138,7 @@ function ChatInboxListener({
             title: `New message in ${title}`,
             body: preview,
             meetupId: id,
+            messageId: msg.id,
           });
         }
       }),
