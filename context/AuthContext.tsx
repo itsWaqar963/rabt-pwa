@@ -11,6 +11,7 @@ import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { upsertProfileFromAuth } from "@/lib/profile-sync";
 import { syncAwakeningFromRemote } from "@/lib/awakening-store";
+import { clearLastSeen } from "@/lib/presence";
 
 export type AuthUser = {
   id: string;
@@ -167,10 +168,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const logout = useCallback(async () => {
+    const uid = user?.id;
+    if (uid) await clearLastSeen(uid);
     await supabase.auth.signOut();
     setIsAuthenticated(false);
     setUser(null);
-  }, []);
+  }, [user?.id]);
 
   return (
     <AuthContext.Provider

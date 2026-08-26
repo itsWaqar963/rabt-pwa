@@ -35,3 +35,22 @@ export async function touchLastSeen(userId: string): Promise<void> {
     console.error("[presence] touchLastSeen", error);
   }
 }
+
+/** Clear presence so admin Online drops immediately on sign-out. */
+export async function clearLastSeen(userId: string): Promise<void> {
+  if (!isSupabaseConfigured || !userId) return;
+  try {
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        last_seen_at: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId);
+    if (error) {
+      console.error("[presence] clearLastSeen", error);
+    }
+  } catch (error) {
+    console.error("[presence] clearLastSeen", error);
+  }
+}
