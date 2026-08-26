@@ -55,6 +55,12 @@ import {
   insertMeetup,
   updateJoinRequestStatus,
 } from "@/lib/meetup-sync";
+import {
+  fetchMyHiddenIds,
+  migrateLocalHiddenIds,
+  upsertMeetupReport,
+  upsertUserReport,
+} from "@/lib/moderation-sync";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 type MeetupStoreValue = {
@@ -124,21 +130,19 @@ export function MeetupStoreProvider({ children }: { children: ReactNode }) {
       created,
       parseHostRequesters(window.localStorage.getItem(HOST_REQUESTERS_KEY)),
     );
-    const hiddenIds = parseHiddenIds(
-      window.localStorage.getItem(HIDDEN_IDS_KEY),
-    );
 
     setAcks({ meetupIds: [], connectIds: ackState.connectIds });
     setCreatedMeetups(created);
     setJoinRequests(joins);
     setHostRequesters(requesters);
-    setHidden(hiddenIds);
+    setHidden(EMPTY_HIDDEN);
     setHydrated(true);
   }, []);
 
   const refresh = useCallback(async () => {
     if (!canUseRemote(userId) || !userId) {
       setRemoteMeetups([]);
+      setHidden(EMPTY_HIDDEN);
       return;
     }
     if (typeof navigator !== "undefined" && !navigator.onLine) {
@@ -147,13 +151,31 @@ export function MeetupStoreProvider({ children }: { children: ReactNode }) {
 
     setLoading(true);
     try {
-      const [meetups, myJoins, hostReqs] = await Promise.all([
+      const legacyHidden = parseHiddenIds(
+        window.localStorage.getItem(HIDDEN_IDS_KEY),
+      );
+      const hasLegacy =
+        legacyHidden.userIds.length > 0 || legacyHidden.meetupIds.length > 0;
+
+      const [meetups, myJoins, hostReqs, hiddenIds] = await Promise.all([
         fetchMeetupsWithHosts(),
         fetchMyJoinRequests(userId),
         fetchHostJoinRequests(userId),
+        hasLegacy
+          ? migrateLocalHiddenIds(userId, legacyHidden)
+          : fetchMyHiddenIds(userId),
       ]);
 
+      if (hasLegacy) {
+        try {
+          window.localStorage.removeItem(HIDDEN_IDS_KEY);
+        } catch {
+          /* ignore */
+        }
+      }
+
       setRemoteMeetups(meetups);
+      setHidden(hiddenIds);
 
       const hostedMine = meetups.filter((m) => m.hostUserId === userId);
       const remoteCreated = hostedMine
@@ -303,10 +325,20 @@ export function MeetupStoreProvider({ children }: { children: ReactNode }) {
     );
   }, [hostRequesters, hydrated]);
 
+  // Clear legacy hide/report localStorage after remote hydrate owns the state.
   useEffect(() => {
-    if (!hydrated) return;
-    window.localStorage.setItem(HIDDEN_IDS_KEY, JSON.stringify(hidden));
-  }, [hidden, hydrated]);
+    if (!hydrated || !canUseRemote(userId)) return;
+    try {
+      const legacy = parseHiddenIds(
+        window.localStorage.getItem(HIDDEN_IDS_KEY),
+      );
+      if (legacy.userIds.length === 0 && legacy.meetupIds.length === 0) {
+        window.localStorage.removeItem(HIDDEN_IDS_KEY);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [hydrated, userId]);
 
   const meetupIds = useMemo(
     () =>
@@ -557,19 +589,54 @@ export function MeetupStoreProvider({ children }: { children: ReactNode }) {
     [hostRequesters, userId],
   );
 
-  const hideUser = useCallback((id: string) => {
-    setHidden((prev) => ({
-      ...prev,
-      userIds: addIdOnce(prev.userIds, id),
-    }));
-  }, []);
+  const hideUser = useCallback(
+    (id: string) => {
+      setHidden((prev) => ({
+        ...prev,
+        userIds: addIdOnce(prev.userIds, id),
+      }));
+      if (
+        canUseRemote(userId) &&
+        userId &&
+        typeof navigator !== "undefined" &&
+        navigator.onLine
+      ) {
+        void upsertUserReport(userId, id).then((ok) => {
+          if (!ok) {
+            console.error(
+              "[meetup-store] upsertUserReport failed; local hide kept",
+            );
+          }
+        });
+      }
+    },
+    [userId],
+  );
 
-  const hideMeetup = useCallback((meetupId: string) => {
-    setHidden((prev) => ({
-      ...prev,
-      meetupIds: addIdOnce(prev.meetupIds, meetupId),
-    }));
-  }, []);
+  const hideMeetup = useCallback(
+    (meetupId: string) => {
+      setHidden((prev) => ({
+        ...prev,
+        meetupIds: addIdOnce(prev.meetupIds, meetupId),
+      }));
+      if (
+        canUseRemote(userId) &&
+        userId &&
+        typeof navigator !== "undefined" &&
+        navigator.onLine &&
+        !isLocalCreatedMeetupId(meetupId)
+      ) {
+        void upsertMeetupReport(userId, meetupId).then((ok) => {
+          if (!ok) {
+            console.error(
+              "[meetup-store] upsertMeetupReport failed; local hide kept",
+            );
+          }
+        });
+      }
+    },
+    [userId],
+  );
 
   const deleteHostedMeetup = useCallback(
     async (meetupId: string): Promise<boolean> => {

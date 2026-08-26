@@ -6,17 +6,21 @@ import { motion, useReducedMotion } from "framer-motion";
 import { ContributeLessonModal } from "@/components/ui/ContributeLessonModal";
 import { LessonQuizModal } from "@/components/ui/LessonQuizModal";
 import { XpReward } from "@/components/ui/XpReward";
+import { useAuth } from "@/context/AuthContext";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { DAILY_QUIZ_GOAL } from "@/lib/learn-earn-lessons";
 import type { LearnLesson } from "@/lib/learn-earn-lessons";
 import {
   loadCompletedIds,
-  loadContributions,
   saveCompletedIds,
-  saveContributions,
   splitLessons,
-  type LessonContribution,
 } from "@/lib/learn-earn-store";
+import {
+  fetchMyLessonSubmissions,
+  submitLessonContribution,
+  type LessonContribution,
+} from "@/lib/moderation-sync";
+import { isSupabaseConfigured } from "@/lib/supabase";
 
 function LessonThumbPlaceholder() {
   return (
@@ -95,6 +99,8 @@ function LessonThumb({
 
 export function LearnEarnSection() {
   const reducedMotion = useReducedMotion();
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
   const [hydrated, setHydrated] = useState(false);
   const [completedIds, setCompletedIds] = useState<string[]>([]);
   const [contributions, setContributions] = useState<LessonContribution[]>([]);
@@ -107,9 +113,27 @@ export function LearnEarnSection() {
 
   useEffect(() => {
     setCompletedIds(loadCompletedIds());
-    setContributions(loadContributions());
+    try {
+      window.localStorage.removeItem("rabt_learn_contributions");
+    } catch {
+      /* ignore */
+    }
     setHydrated(true);
   }, []);
+
+  useEffect(() => {
+    if (!userId || !isSupabaseConfigured) {
+      setContributions([]);
+      return;
+    }
+    let cancelled = false;
+    void fetchMyLessonSubmissions(userId).then((rows) => {
+      if (!cancelled) setContributions(rows);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   const completedSet = useMemo(() => new Set(completedIds), [completedIds]);
   const { pending, completed } = useMemo(
@@ -138,28 +162,21 @@ export function LearnEarnSection() {
     [],
   );
 
-  function handleContribute(input: {
+  async function handleContribute(input: {
     youtubeUrl: string;
     question: string;
     options: [string, string, string, string];
     correctIndex: number;
-  }) {
-    const next: LessonContribution = {
-      id: `contrib-${Date.now()}`,
-      youtubeUrl: input.youtubeUrl,
-      question: input.question,
-      options: input.options,
-      correctIndex: input.correctIndex,
-      status: "pending",
-      submittedAt: new Date().toISOString(),
-    };
-    setContributions((prev) => {
-      const updated = [...prev, next];
-      saveContributions(updated);
-      return updated;
-    });
+  }): Promise<{ ok: true } | { ok: false; error: string }> {
+    if (!userId) {
+      return { ok: false, error: "Sign in to submit a lesson." };
+    }
+    const result = await submitLessonContribution(userId, input);
+    if (!result.ok) return result;
+    setContributions((prev) => [result.contribution, ...prev]);
     setSubmitAck(true);
     window.setTimeout(() => setSubmitAck(false), 2600);
+    return { ok: true };
   }
 
   if (!hydrated) {
@@ -262,12 +279,18 @@ export function LearnEarnSection() {
           </div>
         ) : null}
 
-        {contributions.length > 0 ? (
-          <p className="mt-3 text-[10px] text-muted">
-            {contributions.length} lesson
-            {contributions.length === 1 ? "" : "s"} pending admin review.
-          </p>
-        ) : null}
+        {(() => {
+          const pendingCount = contributions.filter(
+            (c) => c.status === "pending",
+          ).length;
+          if (pendingCount === 0) return null;
+          return (
+            <p className="mt-3 text-[10px] text-muted">
+              {pendingCount} lesson
+              {pendingCount === 1 ? "" : "s"} pending admin review.
+            </p>
+          );
+        })()}
       </section>
 
       <LessonQuizModal

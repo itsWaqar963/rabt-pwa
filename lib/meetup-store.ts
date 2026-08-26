@@ -4,6 +4,7 @@ export const MEETUP_ACKS_KEY = "rabt_meetup_acks";
 export const CREATED_MEETUPS_KEY = "rabt_created_meetups";
 export const JOIN_REQUESTS_KEY = "rabt_join_requests";
 export const HOST_REQUESTERS_KEY = "rabt_host_requesters";
+/** @deprecated Hide/report now uses Supabase user_reports / meetup_reports. */
 export const HIDDEN_IDS_KEY = "rabt_hidden_ids";
 
 export type MeetupCategory =

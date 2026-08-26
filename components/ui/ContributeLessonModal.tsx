@@ -15,7 +15,7 @@ export type ContributeLessonModalProps = {
     question: string;
     options: [string, string, string, string];
     correctIndex: number;
-  }) => void;
+  }) => Promise<{ ok: true } | { ok: false; error: string }>;
 };
 
 type FormState = {
@@ -48,6 +48,7 @@ export function ContributeLessonModal({
   const [shell, setShell] = useState<HTMLElement | null>(null);
   const [form, setForm] = useState<FormState>(INITIAL);
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const { isOffline } = useNetworkStatus();
 
   useEffect(() => {
@@ -60,6 +61,7 @@ export function ContributeLessonModal({
     if (!open) {
       setForm(INITIAL);
       setError(null);
+      setSubmitting(false);
     }
   }, [open]);
 
@@ -77,9 +79,9 @@ export function ContributeLessonModal({
     setError(null);
   }
 
-  function handleSubmit(event: FormEvent) {
+  async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    if (isOffline) return;
+    if (isOffline || submitting) return;
     if (!extractYoutubeId(form.youtubeUrl)) {
       setError("Paste a valid YouTube Short URL.");
       return;
@@ -103,13 +105,25 @@ export function ContributeLessonModal({
       setError("Pick the correct answer.");
       return;
     }
-    onSubmit({
-      youtubeUrl: form.youtubeUrl.trim(),
-      question: form.question.trim(),
-      options,
-      correctIndex,
-    });
-    onClose();
+    setSubmitting(true);
+    setError(null);
+    try {
+      const result = await onSubmit({
+        youtubeUrl: form.youtubeUrl.trim(),
+        question: form.question.trim(),
+        options,
+        correctIndex,
+      });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      onClose();
+    } catch {
+      setError("Could not submit lesson. Try again.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   if (!shell) return null;
@@ -243,14 +257,18 @@ export function ContributeLessonModal({
             <div className="rabt-modal-actions shrink-0 border-t border-[color-mix(in_oklch,var(--border)_70%,transparent)] px-[22px] pt-4">
             <button
               type="submit"
-              disabled={isOffline}
+              disabled={isOffline || submitting}
               className={`min-h-12 w-full rounded-[11px] border font-bold transition-[filter] duration-150 ${
-                isOffline
+                isOffline || submitting
                   ? "cursor-not-allowed border-border bg-transparent text-muted opacity-50"
                   : "border-[color-mix(in_oklch,var(--accent)_65%,var(--border))] bg-accent text-[oklch(0.18_0.03_165)] hover:brightness-110"
               }`}
             >
-              {isOffline ? "Requires Internet" : "Submit for review"}
+              {isOffline
+                ? "Requires Internet"
+                : submitting
+                  ? "Submitting…"
+                  : "Submit for review"}
             </button>
             </div>
           </motion.form>

@@ -5,17 +5,9 @@ import {
 } from "@/lib/learn-earn-lessons";
 
 export const COMPLETED_KEY = "rabt_learn_completed";
-export const CONTRIBUTIONS_KEY = "rabt_learn_contributions";
 
-export type LessonContribution = {
-  id: string;
-  youtubeUrl: string;
-  question: string;
-  options: [string, string, string, string];
-  correctIndex: number;
-  status: "pending";
-  submittedAt: string;
-};
+/** @deprecated Re-export for UI; source of truth is Supabase lesson_submissions. */
+export type { LessonContribution } from "@/lib/moderation-sync";
 
 function parseStringArray(raw: string | null): string[] {
   if (!raw) return [];
@@ -23,47 +15,6 @@ function parseStringArray(raw: string | null): string[] {
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     return parsed.filter((id): id is string => typeof id === "string");
-  } catch {
-    return [];
-  }
-}
-
-function parseContributions(raw: string | null): LessonContribution[] {
-  if (!raw) return [];
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.flatMap((item) => {
-      if (!item || typeof item !== "object") return [];
-      const row = item as Record<string, unknown>;
-      if (
-        typeof row.id !== "string" ||
-        typeof row.youtubeUrl !== "string" ||
-        typeof row.question !== "string" ||
-        !Array.isArray(row.options) ||
-        row.options.length !== 4 ||
-        typeof row.correctIndex !== "number" ||
-        row.status !== "pending" ||
-        typeof row.submittedAt !== "string"
-      ) {
-        return [];
-      }
-      const options = row.options.filter(
-        (o): o is string => typeof o === "string",
-      );
-      if (options.length !== 4) return [];
-      return [
-        {
-          id: row.id,
-          youtubeUrl: row.youtubeUrl,
-          question: row.question,
-          options: options as [string, string, string, string],
-          correctIndex: row.correctIndex,
-          status: "pending",
-          submittedAt: row.submittedAt,
-        },
-      ];
-    });
   } catch {
     return [];
   }
@@ -81,15 +32,6 @@ export function loadCompletedIds(): string[] {
 
 export function saveCompletedIds(ids: string[]): void {
   localStorage.setItem(COMPLETED_KEY, JSON.stringify(ids));
-}
-
-export function loadContributions(): LessonContribution[] {
-  if (typeof window === "undefined") return [];
-  return parseContributions(localStorage.getItem(CONTRIBUTIONS_KEY));
-}
-
-export function saveContributions(items: LessonContribution[]): void {
-  localStorage.setItem(CONTRIBUTIONS_KEY, JSON.stringify(items));
 }
 
 export function extractYoutubeId(url: string): string | null {
