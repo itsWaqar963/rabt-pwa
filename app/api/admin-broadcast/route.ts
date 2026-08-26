@@ -2,13 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { ONLINE_THRESHOLD_MS } from "@/lib/presence";
 import { getSupabaseAdmin, isSupabaseAdminConfigured } from "@/lib/supabase-admin";
 import {
+  endpointHostFromSubscription,
+  getPushErrorBody,
   getPushErrorStatus,
+  getVapidPublicKeyPrefix,
+  isInvalidSubscriptionError,
   isWebPushConfigured,
+  normalizePushSubscription,
   sendPushToSubscription,
-  type PushSubscriptionJSON,
 } from "@/lib/web-push-server";
 
 const BATCH_SIZE = 20;
+const SAMPLE_ERRORS_CAP = 5;
 
 type BroadcastTarget = "all" | "active";
 
@@ -19,6 +24,8 @@ type BroadcastBody = {
   broadcastId?: unknown;
   url?: unknown;
 };
+
+type PushOutcome = "sent" | "failed" | "pruned";
 
 function authorizeAdminBroadcast(req: NextRequest): boolean {
   const secret = process.env.ADMIN_BROADCAST_SECRET?.trim();
@@ -41,6 +48,12 @@ function authorizeAdminBroadcast(req: NextRequest): boolean {
 function parseTarget(raw: unknown): BroadcastTarget | null {
   if (raw === "all" || raw === "active") return raw;
   return null;
+}
+
+function addSampleError(samples: string[], message: string): void {
+  if (samples.length >= SAMPLE_ERRORS_CAP) return;
+  if (samples.includes(message)) return;
+  samples.push(message);
 }
 
 async function loadSubscriptions(
@@ -90,6 +103,24 @@ async function loadSubscriptions(
   }
 }
 
+async function pruneSubscription(subId: string): Promise<boolean> {
+  const admin = getSupabaseAdmin();
+  try {
+    const { error } = await admin
+      .from("push_subscriptions")
+      .delete()
+      .eq("id", subId);
+    if (error) {
+      console.error("[admin-broadcast] prune subscription", error.message);
+      return false;
+    }
+    return true;
+  } catch (deleteErr) {
+    console.error("[admin-broadcast] prune subscription", deleteErr);
+    return false;
+  }
+}
+
 /**
  * POST /api/admin-broadcast
  *
@@ -102,9 +133,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!isWebPushConfigured()) {
+    const vapidConfigured = isWebPushConfigured();
+    const vapidPublicPrefix = getVapidPublicKeyPrefix();
+    console.info("[admin-broadcast] vapid", {
+      configured: vapidConfigured,
+      publicKeyPrefix: vapidPublicPrefix,
+    });
+
+    if (!vapidConfigured) {
       return NextResponse.json(
-        { error: "vapid_not_configured" },
+        {
+          error:
+            "Web Push not configured on PWA — set NEXT_PUBLIC_VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY",
+        },
         { status: 503 },
       );
     }
@@ -154,39 +195,90 @@ export async function POST(req: NextRequest) {
     const admin = getSupabaseAdmin();
     let sent = 0;
     let failed = 0;
+    let pruned = 0;
+    const sampleErrors: string[] = [];
 
     for (let i = 0; i < rows.length; i += BATCH_SIZE) {
       const batch = rows.slice(i, i + BATCH_SIZE);
       const results = await Promise.all(
-        batch.map(async (row) => {
+        batch.map(async (row): Promise<PushOutcome> => {
+          const normalized = normalizePushSubscription(row.subscription_json);
+          const endpointHost = endpointHostFromSubscription(normalized);
+
+          if (
+            !normalized ||
+            !normalized.keys?.p256dh ||
+            !normalized.keys?.auth
+          ) {
+            const message = "Invalid push subscription";
+            console.error("[admin-broadcast] push fail", {
+              subId: row.id,
+              status: null,
+              endpointHost,
+              message,
+              body: undefined,
+            });
+            addSampleError(sampleErrors, message);
+            const didPrune = await pruneSubscription(row.id);
+            return didPrune ? "pruned" : "failed";
+          }
+
           try {
-            await sendPushToSubscription(
-              row.subscription_json as PushSubscriptionJSON,
-              {
-                title,
-                body,
-                url,
-                kind: "broadcast",
-                broadcastId,
-              },
-            );
-            return "sent" as const;
+            await sendPushToSubscription(normalized, {
+              title,
+              body,
+              url,
+              kind: "broadcast",
+              broadcastId,
+            });
+            return "sent";
           } catch (err) {
             const status = getPushErrorStatus(err);
-            if (status === 404 || status === 410) {
-              try {
-                await admin.from("push_subscriptions").delete().eq("id", row.id);
-              } catch (deleteErr) {
-                console.error("[admin-broadcast] prune subscription", deleteErr);
-              }
+            const errBody = getPushErrorBody(err);
+            const message = String(err);
+            console.error("[admin-broadcast] push fail", {
+              subId: row.id,
+              status,
+              endpointHost,
+              message,
+              body: errBody,
+            });
+
+            const sample =
+              status != null
+                ? `HTTP ${status}${errBody ? `: ${errBody.slice(0, 120)}` : ""}`
+                : message.slice(0, 160);
+            addSampleError(sampleErrors, sample);
+
+            const shouldPrune =
+              status === 404 ||
+              status === 410 ||
+              isInvalidSubscriptionError(err);
+
+            if (shouldPrune) {
+              const didPrune = await pruneSubscription(row.id);
+              return didPrune ? "pruned" : "failed";
             }
-            return "failed" as const;
+            return "failed";
           }
         }),
       );
       for (const r of results) {
-        if (r === "sent") sent += 1;
-        else failed += 1;
+        switch (r) {
+          case "sent":
+            sent += 1;
+            break;
+          case "failed":
+            failed += 1;
+            break;
+          case "pruned":
+            pruned += 1;
+            break;
+          default: {
+            const _exhaustive: never = r;
+            void _exhaustive;
+          }
+        }
       }
     }
 
@@ -207,9 +299,11 @@ export async function POST(req: NextRequest) {
       subscriptions: rows.length,
       sent,
       failed,
+      pruned,
+      sampleErrors,
     });
 
-    return NextResponse.json({ sent, failed });
+    return NextResponse.json({ sent, failed, pruned, sampleErrors });
   } catch (err) {
     console.error("[admin-broadcast]", err);
     return NextResponse.json({ error: "push_error" }, { status: 500 });

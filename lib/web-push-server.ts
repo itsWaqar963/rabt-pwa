@@ -38,6 +38,64 @@ export function isWebPushConfigured(): boolean {
   return getVapidConfig() !== null;
 }
 
+/** First 8 chars of public VAPID key for mismatch debugging — never log private key. */
+export function getVapidPublicKeyPrefix(): string | null {
+  const cfg = getVapidConfig();
+  if (!cfg) return null;
+  return cfg.publicKey.slice(0, 8);
+}
+
+/**
+ * Normalize DB `subscription_json` to PushSubscriptionJSON.
+ * Handles nested `{ subscription: {...} }` and stringified JSON.
+ */
+export function normalizePushSubscription(
+  raw: unknown,
+): PushSubscriptionJSON | null {
+  let value: unknown = raw;
+  if (typeof value === "string") {
+    try {
+      value = JSON.parse(value) as unknown;
+    } catch {
+      return null;
+    }
+  }
+  if (!value || typeof value !== "object") return null;
+
+  const obj = value as Record<string, unknown>;
+  const nested = obj.subscription;
+  if (nested && typeof nested === "object") {
+    return normalizePushSubscription(nested);
+  }
+
+  const endpoint = typeof obj.endpoint === "string" ? obj.endpoint : "";
+  const keys =
+    obj.keys && typeof obj.keys === "object"
+      ? (obj.keys as { p256dh?: string; auth?: string })
+      : undefined;
+
+  if (!endpoint) return null;
+  return {
+    endpoint,
+    expirationTime:
+      typeof obj.expirationTime === "number" || obj.expirationTime === null
+        ? (obj.expirationTime as number | null)
+        : undefined,
+    keys,
+  };
+}
+
+export function endpointHostFromSubscription(
+  subscription: PushSubscriptionJSON | null,
+): string | null {
+  if (!subscription?.endpoint) return null;
+  try {
+    return new URL(subscription.endpoint).hostname;
+  } catch {
+    return null;
+  }
+}
+
 let configured = false;
 
 function ensureVapidConfigured(): boolean {
@@ -91,4 +149,25 @@ export function getPushErrorStatus(err: unknown): number | null {
     return (err as { statusCode: number }).statusCode;
   }
   return null;
+}
+
+export function getPushErrorBody(err: unknown): string | undefined {
+  if (!err || typeof err !== "object" || !("body" in err)) return undefined;
+  const body = (err as { body: unknown }).body;
+  if (typeof body === "string") return body.slice(0, 500);
+  if (body == null) return undefined;
+  try {
+    return String(body).slice(0, 500);
+  } catch {
+    return undefined;
+  }
+}
+
+export function isInvalidSubscriptionError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return (
+    msg.includes("Invalid push subscription") ||
+    msg.includes("missing keys") ||
+    (/p256dh|auth/i.test(msg) && /missing|required|invalid/i.test(msg))
+  );
 }
