@@ -1,5 +1,5 @@
 /* RABT PWA service worker — Web Push + notification deep-link
- * Cache-bust: v6 — absolute notify icons + fail-open showNotification.
+ * Cache-bust: v7 — admin broadcast kind (tag + /discover default).
  */
 
 function toAbsoluteUrl(url) {
@@ -28,6 +28,8 @@ self.addEventListener("push", (event) => {
     url: undefined,
     meetupId: undefined,
     messageId: undefined,
+    kind: undefined,
+    broadcastId: undefined,
   };
   try {
     if (event.data) {
@@ -38,6 +40,8 @@ self.addEventListener("push", (event) => {
         url: parsed.url,
         meetupId: parsed.meetupId,
         messageId: parsed.messageId,
+        kind: parsed.kind,
+        broadcastId: parsed.broadcastId,
       };
     }
   } catch {
@@ -49,18 +53,22 @@ self.addEventListener("push", (event) => {
     }
   }
 
+  const isBroadcast = data.kind === "broadcast";
   const relativeOrAbs =
     data.url ||
-    (data.meetupId
-      ? "/meetups?chat=" + encodeURIComponent(data.meetupId)
-      : "/meetups");
+    (isBroadcast
+      ? "/discover"
+      : data.meetupId
+        ? "/meetups?chat=" + encodeURIComponent(data.meetupId)
+        : "/meetups");
   const url = toAbsoluteUrl(relativeOrAbs);
-  // Unique tag per message — never collapse consecutive pushes for same meetup.
-  const tag =
-    "rabt-chat-" +
-    (data.messageId
-      ? data.messageId
-      : (data.meetupId || "evt") + "-" + Date.now());
+  // Unique tag — broadcast vs meetup chat; never collapse consecutive pushes.
+  const tag = isBroadcast
+    ? "rabt-broadcast-" + (data.broadcastId || Date.now())
+    : "rabt-chat-" +
+      (data.messageId
+        ? data.messageId
+        : (data.meetupId || "evt") + "-" + Date.now());
 
   event.waitUntil(
     (async () => {
@@ -75,6 +83,8 @@ self.addEventListener("push", (event) => {
             type: "RABT_PUSH_MESSAGE",
             meetupId: data.meetupId,
             messageId: data.messageId,
+            kind: data.kind,
+            broadcastId: data.broadcastId,
             title: data.title,
             body: data.body,
             url,
@@ -88,9 +98,11 @@ self.addEventListener("push", (event) => {
         url,
         meetupId: data.meetupId,
         messageId: data.messageId,
+        kind: data.kind,
+        broadcastId: data.broadcastId,
       };
       const title = data.title || "RABT";
-      const body = data.body || "New message";
+      const body = data.body || (isBroadcast ? "Announcement" : "New message");
 
       // Always show OS tray on push (reliability). Fail open: retry without
       // icon/badge if asset URLs break showNotification on some Android.
@@ -126,15 +138,18 @@ self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
   const payload = event.notification.data || {};
+  const isBroadcast = payload.kind === "broadcast";
   const targetRaw =
     payload.url ||
-    (payload.meetupId
-      ? "/meetups?chat=" + encodeURIComponent(payload.meetupId)
-      : "/meetups");
+    (isBroadcast
+      ? "/discover"
+      : payload.meetupId
+        ? "/meetups?chat=" + encodeURIComponent(payload.meetupId)
+        : "/meetups");
   const absoluteUrl = toAbsoluteUrl(targetRaw);
 
   let meetupId = payload.meetupId;
-  if (!meetupId) {
+  if (!meetupId && !isBroadcast) {
     try {
       meetupId = new URL(absoluteUrl).searchParams.get("chat") || undefined;
     } catch {
@@ -156,15 +171,17 @@ self.addEventListener("notificationclick", (event) => {
         if (!("focus" in client)) continue;
 
         await client.focus();
-        try {
-          client.postMessage({
-            type: "RABT_OPEN_CHAT",
-            meetupId: meetupId || undefined,
-            url: absoluteUrl,
-            title: "Meetup",
-          });
-        } catch {
-          /* postMessage may fail on some clients */
+        if (meetupId && !isBroadcast) {
+          try {
+            client.postMessage({
+              type: "RABT_OPEN_CHAT",
+              meetupId: meetupId || undefined,
+              url: absoluteUrl,
+              title: "Meetup",
+            });
+          } catch {
+            /* postMessage may fail on some clients */
+          }
         }
 
         if ("navigate" in client && typeof client.navigate === "function") {

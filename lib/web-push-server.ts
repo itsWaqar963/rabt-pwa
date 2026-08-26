@@ -7,6 +7,9 @@ export type PushPayload = {
   meetupId?: string;
   /** Unique per message — SW uses for notification tag (avoids collapse). */
   messageId?: string;
+  /** Admin announce — SW uses broadcast tag + /discover default. */
+  kind?: "broadcast" | "meetup";
+  broadcastId?: string;
 };
 
 export type PushSubscriptionJSON = {
