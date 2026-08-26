@@ -21,6 +21,26 @@ export type PushSubscriptionJSON = {
   };
 };
 
+const DEFAULT_VAPID_SUBJECT = "mailto:admin@rabt.app";
+
+/**
+ * web-push requires subject as a URL (`mailto:` or `https:`).
+ * Accepts bare emails from env and prefixes `mailto:`.
+ */
+function normalizeVapidSubject(raw: string | undefined): string {
+  const value = raw?.trim();
+  if (!value) return DEFAULT_VAPID_SUBJECT;
+  const lower = value.toLowerCase();
+  if (lower.startsWith("mailto:") || lower.startsWith("https:")) {
+    return value;
+  }
+  // Bare email (or email-like) — never pass to setVapidDetails without scheme.
+  if (value.includes("@") && !value.includes("://")) {
+    return `mailto:${value}`;
+  }
+  return DEFAULT_VAPID_SUBJECT;
+}
+
 function getVapidConfig(): {
   subject: string;
   publicKey: string;
@@ -28,8 +48,9 @@ function getVapidConfig(): {
 } | null {
   const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim();
   const privateKey = process.env.VAPID_PRIVATE_KEY?.trim();
-  const subject =
-    process.env.VAPID_SUBJECT?.trim() || "mailto:admin@example.com";
+  const subject = normalizeVapidSubject(
+    process.env.VAPID_SUBJECT?.trim() || process.env.VAPID_EMAIL?.trim(),
+  );
   if (!publicKey || !privateKey) return null;
   return { subject, publicKey, privateKey };
 }
