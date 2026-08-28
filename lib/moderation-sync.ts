@@ -19,6 +19,9 @@ export type LessonContributionInput = {
   question: string;
   options: [string, string, string, string];
   correctIndex: number;
+  isOwnChannel: boolean;
+  channelTitle: string;
+  channelAvatarUrl?: string | null;
 };
 
 export type LessonContribution = {
@@ -76,6 +79,9 @@ export async function submitLessonContribution(
     correct_index: input.correctIndex,
     status: "pending",
     submitter_id: submitterId,
+    is_own_channel: input.isOwnChannel,
+    channel_title: input.channelTitle,
+    channel_avatar_url: input.channelAvatarUrl ?? null,
   };
 
   const result = await withJwtRetry(async () => {

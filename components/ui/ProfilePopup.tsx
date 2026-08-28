@@ -203,6 +203,15 @@ export function ProfilePopup({ user, open, onClose, onHide }: ProfilePopupProps)
                     </div>
 
                     <p className="mt-2 text-[12px] text-muted">{user.subline}</p>
+                    {typeof user.contributionCount === "number" &&
+                    user.contributionCount > 0 ? (
+                      <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.08em] text-accent">
+                        {user.contributionCount}{" "}
+                        {user.contributionCount === 1
+                          ? "contribution"
+                          : "contributions"}
+                      </p>
+                    ) : null}
                   </div>
 
                   <div className="mt-5 min-h-12 border-l-2 border-accent bg-[color-mix(in_oklch,var(--accent)_14%,transparent)] px-3 py-2.5 text-left">

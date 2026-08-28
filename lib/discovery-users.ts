@@ -40,6 +40,7 @@ export type DiscoveryUser = UserCardProps & {
   skills?: string[];
   isOnline?: boolean;
   lastSeenAt?: string;
+  contributionCount?: number;
 };
 
 export type HostedMeetup = {
@@ -73,6 +74,7 @@ export type HostedMeetup = {
   hostSocialUrls?: ReturnType<typeof normalizeSocialUrls>;
   hostLastSeenAt?: string;
   hostIsOnline?: boolean;
+  hostContributionCount?: number;
   /** Raw create fields when available */
   date?: string;
   time?: string;
@@ -182,6 +184,11 @@ export function hostedMeetupToDiscoveryUser(
     skills: meetup.hostSkills ?? [],
     isOnline: meetup.hostIsOnline === true,
     lastSeenAt: meetup.hostLastSeenAt,
+    contributionCount:
+      typeof meetup.hostContributionCount === "number" &&
+      meetup.hostContributionCount > 0
+        ? meetup.hostContributionCount
+        : undefined,
     links: socialUrlsToDiscoveryLinks(
       meetup.hostSocialUrls ?? normalizeSocialUrls(null),
     ),

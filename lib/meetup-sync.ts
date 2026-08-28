@@ -14,6 +14,7 @@ import {
   parseProfileGender,
 } from "@/lib/profile-store";
 import { withJwtRetry } from "@/lib/auth-retry";
+import { fetchApprovedContributionCounts } from "@/lib/contributions-sync";
 import { isProfileOnline } from "@/lib/presence";
 import { normalizeSocialUrls } from "@/lib/social-links";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
@@ -313,6 +314,13 @@ export async function fetchMeetupsWithHosts(): Promise<HostedMeetup[]> {
         acceptedMap.get(row.id) ?? 0,
       ),
     );
+
+    const hostIds = [...new Set(mapped.map((m) => m.hostUserId).filter(Boolean))];
+    const contributionCounts = await fetchApprovedContributionCounts(hostIds);
+    mapped = mapped.map((m) => {
+      const count = contributionCounts.get(m.hostUserId) ?? 0;
+      return count > 0 ? { ...m, hostContributionCount: count } : m;
+    });
 
     // Fill stale embeds that have host but no avatar_url
     const gapHostIds = mapped

@@ -3,6 +3,8 @@ export type LearnLesson = {
   title: string;
   youtubeId: string;
   contributor: string;
+  channelTitle: string;
+  channelAvatarUrl?: string;
   question: string;
   options: [string, string, string, string];
   correctIndex: number;

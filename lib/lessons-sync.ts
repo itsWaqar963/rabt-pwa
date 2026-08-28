@@ -28,11 +28,17 @@ export function submissionRowToLearnLesson(
   if (!options || !youtubeId) return null;
   if (row.correct_index < 0 || row.correct_index > 3) return null;
 
+  const channelTitle =
+    row.channel_title?.trim() || "YouTube";
+  const channelAvatarUrl = row.channel_avatar_url?.trim() || undefined;
+
   return {
     id: row.id,
     title: lessonTitle(row.question),
     youtubeId,
     contributor: contributor?.trim() || "Community",
+    channelTitle,
+    channelAvatarUrl,
     question: row.question,
     options,
     correctIndex: row.correct_index,

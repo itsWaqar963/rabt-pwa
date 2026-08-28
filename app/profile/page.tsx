@@ -31,6 +31,7 @@ import {
   type ProfileRow,
 } from "@/lib/profile-sync";
 import { getConfiguredSocialLinks } from "@/lib/social-links";
+import { fetchApprovedContributionCount } from "@/lib/contributions-sync";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 export default function ProfilePage() {
@@ -42,6 +43,7 @@ export default function ProfilePage() {
   const [editOpen, setEditOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
+  const [contributionCount, setContributionCount] = useState(0);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const displayName = user?.name || profile.name;
@@ -75,6 +77,11 @@ export default function ProfilePage() {
           setProfile(next);
           saveProfile(next);
         }
+      }
+
+      if (user?.id) {
+        const count = await fetchApprovedContributionCount(user.id);
+        if (!cancelled) setContributionCount(count);
       }
     }
 
@@ -327,6 +334,10 @@ export default function ProfilePage() {
               visible to matches
             </span>
           </div>
+          <p className="mb-3 px-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted">
+            Total Contributions:{" "}
+            <span className="font-bold text-accent">{contributionCount}</span>
+          </p>
           <div className="grid grid-cols-2 gap-x-2 gap-y-3">
             {clusterSignalItems(profile).map((item) => (
               <div

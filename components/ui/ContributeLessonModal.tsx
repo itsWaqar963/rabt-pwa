@@ -6,6 +6,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { X } from "lucide-react";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { extractYoutubeId } from "@/lib/learn-earn-lessons";
+import { fetchYoutubeChannelMeta } from "@/lib/youtube-oembed";
 
 export type ContributeLessonModalProps = {
   open: boolean;
@@ -15,6 +16,9 @@ export type ContributeLessonModalProps = {
     question: string;
     options: [string, string, string, string];
     correctIndex: number;
+    isOwnChannel: boolean;
+    channelTitle: string;
+    channelAvatarUrl?: string | null;
   }) => Promise<{ ok: true } | { ok: false; error: string }>;
 };
 
@@ -26,6 +30,7 @@ type FormState = {
   optionC: string;
   optionD: string;
   correctIndex: string;
+  isOwnChannel: boolean;
 };
 
 const INITIAL: FormState = {
@@ -36,6 +41,7 @@ const INITIAL: FormState = {
   optionC: "",
   optionD: "",
   correctIndex: "0",
+  isOwnChannel: false,
 };
 
 export function ContributeLessonModal({
@@ -47,6 +53,9 @@ export function ContributeLessonModal({
   const reducedMotion = useReducedMotion();
   const [shell, setShell] = useState<HTMLElement | null>(null);
   const [form, setForm] = useState<FormState>(INITIAL);
+  const [channelTitle, setChannelTitle] = useState("YouTube");
+  const [channelAvatarUrl, setChannelAvatarUrl] = useState<string | null>(null);
+  const [channelLoading, setChannelLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const { isOffline } = useNetworkStatus();
@@ -60,6 +69,9 @@ export function ContributeLessonModal({
   useEffect(() => {
     if (!open) {
       setForm(INITIAL);
+      setChannelTitle("YouTube");
+      setChannelAvatarUrl(null);
+      setChannelLoading(false);
       setError(null);
       setSubmitting(false);
     }
@@ -77,6 +89,27 @@ export function ContributeLessonModal({
   function setField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
     setError(null);
+  }
+
+  async function resolveChannelMeta(url: string) {
+    if (!extractYoutubeId(url)) {
+      setChannelTitle("YouTube");
+      setChannelAvatarUrl(null);
+      return;
+    }
+    setChannelLoading(true);
+    try {
+      const meta = await fetchYoutubeChannelMeta(url);
+      setChannelTitle(meta.channelTitle);
+      setChannelAvatarUrl(meta.channelAvatarUrl);
+    } finally {
+      setChannelLoading(false);
+    }
+  }
+
+  async function handleYoutubeBlur() {
+    if (isOffline) return;
+    await resolveChannelMeta(form.youtubeUrl.trim());
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -108,11 +141,21 @@ export function ContributeLessonModal({
     setSubmitting(true);
     setError(null);
     try {
+      let resolvedTitle = channelTitle;
+      let resolvedAvatar = channelAvatarUrl;
+      if (!channelLoading && channelTitle === "YouTube" && !channelAvatarUrl) {
+        const meta = await fetchYoutubeChannelMeta(form.youtubeUrl.trim());
+        resolvedTitle = meta.channelTitle;
+        resolvedAvatar = meta.channelAvatarUrl;
+      }
       const result = await onSubmit({
         youtubeUrl: form.youtubeUrl.trim(),
         question: form.question.trim(),
         options,
         correctIndex,
+        isOwnChannel: form.isOwnChannel,
+        channelTitle: resolvedTitle,
+        channelAvatarUrl: resolvedAvatar,
       });
       if (!result.ok) {
         setError(result.error);
@@ -197,9 +240,29 @@ export function ContributeLessonModal({
               <input
                 value={form.youtubeUrl}
                 onChange={(e) => setField("youtubeUrl", e.target.value)}
+                onBlur={() => void handleYoutubeBlur()}
                 placeholder="https://youtube.com/shorts/..."
                 className={fieldClass}
               />
+              {channelLoading ? (
+                <span className="text-[10px] text-muted">Loading channel…</span>
+              ) : channelTitle !== "YouTube" ? (
+                <span className="text-[10px] text-muted">
+                  Channel: {channelTitle}
+                </span>
+              ) : null}
+            </label>
+
+            <label className="mt-3 flex cursor-pointer items-center gap-2.5">
+              <input
+                type="checkbox"
+                checked={form.isOwnChannel}
+                onChange={(e) => setField("isOwnChannel", e.target.checked)}
+                className="size-4 accent-[var(--accent)]"
+              />
+              <span className="text-xs text-foreground">
+                This is my own YouTube channel
+              </span>
             </label>
 
             <label className="mt-3 grid gap-[7px]">

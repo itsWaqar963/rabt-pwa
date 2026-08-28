@@ -42,6 +42,9 @@ export type Database = {
           reviewed_by: string | null;
           reviewed_at: string | null;
           created_at: string;
+          is_own_channel: boolean;
+          channel_title: string | null;
+          channel_avatar_url: string | null;
         };
         Insert: {
           id?: string;
@@ -54,6 +57,9 @@ export type Database = {
           reviewed_by?: string | null;
           reviewed_at?: string | null;
           created_at?: string;
+          is_own_channel?: boolean;
+          channel_title?: string | null;
+          channel_avatar_url?: string | null;
         };
         Update: {
           id?: string;
@@ -66,6 +72,9 @@ export type Database = {
           reviewed_by?: string | null;
           reviewed_at?: string | null;
           created_at?: string;
+          is_own_channel?: boolean;
+          channel_title?: string | null;
+          channel_avatar_url?: string | null;
         };
       };
       user_reports: {

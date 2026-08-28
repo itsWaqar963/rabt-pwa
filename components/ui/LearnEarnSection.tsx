@@ -23,6 +23,7 @@ import {
 } from "@/lib/moderation-sync";
 import { incrementProfileXp } from "@/lib/profile-sync";
 import { loadProfile, saveProfile } from "@/lib/profile-store";
+import { fetchYoutubeChannelMeta } from "@/lib/youtube-oembed";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 const LESSON_XP_REWARD = 50;
@@ -53,11 +54,15 @@ function LessonThumb({
 }) {
   const { isOffline } = useNetworkStatus();
   const [imgFailed, setImgFailed] = useState(false);
+  const [avatarFailed, setAvatarFailed] = useState(false);
   const showPlaceholder = isOffline || imgFailed;
+  const channelName = lesson.channelTitle || "YouTube";
+  const channelInitial = channelName.charAt(0).toUpperCase();
 
   useEffect(() => {
     setImgFailed(false);
-  }, [lesson.youtubeId, isOffline]);
+    setAvatarFailed(false);
+  }, [lesson.youtubeId, lesson.channelAvatarUrl, isOffline]);
 
   return (
     <button
@@ -92,12 +97,21 @@ function LessonThumb({
           </>
         )}
       </div>
-      <div className="px-2 py-2">
-        <p className="line-clamp-2 text-[10px] font-semibold leading-[1.35] text-foreground">
-          {lesson.title}
-        </p>
-        <p className="mt-1 font-mono text-[8px] uppercase tracking-[0.06em] text-muted">
-          {completed ? "Completed" : "Pending"}
+      <div className="flex items-center gap-1.5 px-2 py-2">
+        {lesson.channelAvatarUrl && !avatarFailed ? (
+          <img
+            src={lesson.channelAvatarUrl}
+            alt=""
+            className="size-5 shrink-0 rounded-full border border-border object-cover"
+            onError={() => setAvatarFailed(true)}
+          />
+        ) : (
+          <span className="grid size-5 shrink-0 place-items-center rounded-full border border-border bg-[color-mix(in_oklch,var(--bg)_60%,transparent)] text-[8px] font-semibold text-muted">
+            {channelInitial}
+          </span>
+        )}
+        <p className="min-w-0 truncate text-[10px] font-medium text-foreground">
+          {channelName}
         </p>
       </div>
     </button>
@@ -244,11 +258,25 @@ export function LearnEarnSection() {
     question: string;
     options: [string, string, string, string];
     correctIndex: number;
+    isOwnChannel: boolean;
+    channelTitle: string;
+    channelAvatarUrl?: string | null;
   }): Promise<{ ok: true } | { ok: false; error: string }> {
     if (!userId) {
       return { ok: false, error: "Sign in to submit a lesson." };
     }
-    const result = await submitLessonContribution(userId, input);
+    const channelMeta =
+      input.channelTitle === "YouTube" && !input.channelAvatarUrl
+        ? await fetchYoutubeChannelMeta(input.youtubeUrl)
+        : {
+            channelTitle: input.channelTitle,
+            channelAvatarUrl: input.channelAvatarUrl ?? null,
+          };
+    const result = await submitLessonContribution(userId, {
+      ...input,
+      channelTitle: channelMeta.channelTitle,
+      channelAvatarUrl: channelMeta.channelAvatarUrl,
+    });
     if (!result.ok) return result;
     setContributions((prev) => [result.contribution, ...prev]);
     setSubmitAck(true);
