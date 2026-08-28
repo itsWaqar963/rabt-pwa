@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, Play, Plus } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { ContributeLessonModal } from "@/components/ui/ContributeLessonModal";
@@ -13,24 +13,21 @@ import type { LearnLesson } from "@/lib/learn-earn-lessons";
 import {
   loadCompletedIds,
   saveCompletedIds,
-  splitLessons,
+  splitApprovedLessons,
 } from "@/lib/learn-earn-store";
+import { fetchApprovedLessons } from "@/lib/lessons-sync";
 import {
   fetchMyLessonSubmissions,
   submitLessonContribution,
   type LessonContribution,
 } from "@/lib/moderation-sync";
-import {
-  incrementProfileXp,
-} from "@/lib/profile-sync";
-import {
-  loadProfile,
-  saveProfile,
-} from "@/lib/profile-store";
-import { isSupabaseConfigured } from "@/lib/supabase";
+import { incrementProfileXp } from "@/lib/profile-sync";
+import { loadProfile, saveProfile } from "@/lib/profile-store";
+import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 const LESSON_XP_REWARD = 50;
 const PAGE_SIZE = 20;
+const REALTIME_DEBOUNCE_MS = 400;
 
 function LessonThumbPlaceholder() {
   return (
@@ -113,6 +110,9 @@ export function LearnEarnSection() {
   const userId = user?.id ?? null;
   const [hydrated, setHydrated] = useState(false);
   const [completedIds, setCompletedIds] = useState<string[]>([]);
+  const [approvedLessons, setApprovedLessons] = useState<LearnLesson[]>([]);
+  const [lessonsLoading, setLessonsLoading] = useState(true);
+  const [lessonsError, setLessonsError] = useState<string | null>(null);
   const [contributions, setContributions] = useState<LessonContribution[]>([]);
   const [activeLesson, setActiveLesson] = useState<LearnLesson | null>(null);
   const [quizOpen, setQuizOpen] = useState(false);
@@ -121,6 +121,7 @@ export function LearnEarnSection() {
   const [visiblePendingCount, setVisiblePendingCount] = useState(PAGE_SIZE);
   const [showXp, setShowXp] = useState(false);
   const [submitAck, setSubmitAck] = useState(false);
+  const refetchRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     setCompletedIds(loadCompletedIds());
@@ -131,6 +132,59 @@ export function LearnEarnSection() {
     }
     setHydrated(true);
   }, []);
+
+  const refetchLessons = useCallback(async () => {
+    if (!isSupabaseConfigured) {
+      setApprovedLessons([]);
+      setLessonsLoading(false);
+      return;
+    }
+    setLessonsError(null);
+    try {
+      const rows = await fetchApprovedLessons();
+      setApprovedLessons(rows);
+    } catch {
+      setLessonsError("Could not load lessons.");
+    } finally {
+      setLessonsLoading(false);
+    }
+  }, []);
+
+  refetchRef.current = () => {
+    void refetchLessons();
+  };
+
+  useEffect(() => {
+    if (!hydrated) return;
+    setLessonsLoading(true);
+    void refetchLessons();
+  }, [hydrated, refetchLessons]);
+
+  useEffect(() => {
+    if (!hydrated || !isSupabaseConfigured) return;
+
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const scheduleRefetch = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        refetchRef.current?.();
+      }, REALTIME_DEBOUNCE_MS);
+    };
+
+    const channel = supabase
+      .channel("rabt-lesson-submissions")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "lesson_submissions" },
+        scheduleRefetch,
+      )
+      .subscribe();
+
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      void supabase.removeChannel(channel);
+    };
+  }, [hydrated]);
 
   useEffect(() => {
     if (!userId || !isSupabaseConfigured) {
@@ -148,18 +202,19 @@ export function LearnEarnSection() {
 
   const completedSet = useMemo(() => new Set(completedIds), [completedIds]);
   const { pending, completed } = useMemo(
-    () => splitLessons(completedSet),
-    [completedSet],
+    () => splitApprovedLessons(approvedLessons, completedSet),
+    [approvedLessons, completedSet],
   );
 
   const completedCount = completed.length;
-  const total = pending.length + completed.length;
+  const total = approvedLessons.length;
   const visiblePending = pending.slice(0, visiblePendingCount);
   const hasMorePending = pending.length > visiblePendingCount;
   const progressPct = Math.min(
     100,
     (completedCount / DAILY_QUIZ_GOAL) * 100,
   );
+  const isZeroState = !lessonsLoading && approvedLessons.length === 0;
 
   const markComplete = useCallback(
     (lessonId: string) => {
@@ -253,29 +308,43 @@ export function LearnEarnSection() {
           </div>
         </div>
 
-        <div className="-mx-1 mt-4 flex gap-3 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {visiblePending.map((lesson) => (
-            <LessonThumb
-              key={lesson.id}
-              lesson={lesson}
-              onClick={() => {
-                setActiveLesson(lesson);
-                setQuizOpen(true);
-              }}
-            />
-          ))}
-        </div>
+        {lessonsLoading ? (
+          <div className="mt-4 h-28 animate-pulse rounded-[12px] bg-[color-mix(in_oklch,var(--fg)_6%,transparent)]" />
+        ) : null}
 
-        {hasMorePending ? (
-          <button
-            type="button"
-            onClick={() =>
-              setVisiblePendingCount((count) => count + PAGE_SIZE)
-            }
-            className="mt-2 w-full py-2 text-center font-mono text-[10px] uppercase tracking-[0.08em] text-accent transition-colors hover:text-foreground"
-          >
-            See more
-          </button>
+        {lessonsError ? (
+          <p className="mt-3 text-[10px] text-red-400" role="alert">
+            {lessonsError}
+          </p>
+        ) : null}
+
+        {!lessonsLoading && !isZeroState ? (
+          <>
+            <div className="-mx-1 mt-4 flex gap-3 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {visiblePending.map((lesson) => (
+                <LessonThumb
+                  key={lesson.id}
+                  lesson={lesson}
+                  onClick={() => {
+                    setActiveLesson(lesson);
+                    setQuizOpen(true);
+                  }}
+                />
+              ))}
+            </div>
+
+            {hasMorePending ? (
+              <button
+                type="button"
+                onClick={() =>
+                  setVisiblePendingCount((count) => count + PAGE_SIZE)
+                }
+                className="mt-2 w-full py-2 text-center font-mono text-[10px] uppercase tracking-[0.08em] text-accent transition-colors hover:text-foreground"
+              >
+                See more
+              </button>
+            ) : null}
+          </>
         ) : null}
 
         <button
@@ -287,7 +356,7 @@ export function LearnEarnSection() {
           Contribute a Lesson
         </button>
 
-        {completed.length > 0 ? (
+        {!lessonsLoading && completed.length > 0 ? (
           <div className="mt-4 border-t border-[color-mix(in_oklch,var(--border)_78%,transparent)] pt-3">
             <button
               type="button"

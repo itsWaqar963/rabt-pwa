@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { X } from "lucide-react";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
-import { extractYoutubeId } from "@/lib/learn-earn-store";
+import { extractYoutubeId } from "@/lib/learn-earn-lessons";
 
 export type ContributeLessonModalProps = {
   open: boolean;
