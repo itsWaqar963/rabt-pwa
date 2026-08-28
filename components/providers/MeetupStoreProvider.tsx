@@ -282,6 +282,11 @@ export function MeetupStoreProvider({ children }: { children: ReactNode }) {
         { event: "*", schema: "public", table: "join_requests" },
         scheduleRefresh,
       )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "profiles" },
+        scheduleRefresh,
+      )
       .subscribe();
 
     return () => {

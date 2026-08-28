@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { BetaStorageReset } from "@/components/BetaStorageReset";
 import { AuthProvider } from "@/context/AuthContext";
 import { ChatNotifyProvider } from "@/components/providers/ChatNotifyProvider";
 import { GlobalMeetupChatHost } from "@/components/providers/GlobalMeetupChatHost";
@@ -48,6 +49,7 @@ export default function RootLayout({
     <html lang="en" className="font-body">
       <body className="bg-background text-foreground font-body antialiased">
         <div className="max-w-md mx-auto min-h-screen relative overflow-hidden bg-background text-foreground">
+          <BetaStorageReset />
           <AuthProvider>
             <MeetupStoreProvider>
               <ChatNotifyProvider>

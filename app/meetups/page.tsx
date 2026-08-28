@@ -18,11 +18,7 @@ import {
   getFilterMetaLabel,
   type DiscoveryFilters,
 } from "@/lib/discovery-filters";
-import {
-  DISCOVERY_USERS,
-  getHostedMeetups,
-  type HostedMeetup,
-} from "@/lib/discovery-users";
+import { type HostedMeetup } from "@/lib/discovery-users";
 import {
   countAcceptedRequesters,
   createdMeetupToHosted,
@@ -120,11 +116,6 @@ function MeetupsPageContent() {
   } = useMeetupStore();
   const { isOffline } = useNetworkStatus();
 
-  const seedMeetups = useMemo(
-    () => getHostedMeetups(DISCOVERY_USERS),
-    [],
-  );
-
   const createdAsHosted = useMemo(
     () =>
       createdMeetups
@@ -146,14 +137,8 @@ function MeetupsPageContent() {
     for (const m of createdAsHosted) {
       if (!byId.has(m.id)) byId.set(m.id, m);
     }
-    // Fallback seed only when remote empty (offline / unconfigured / empty DB)
-    if (byId.size === 0) {
-      for (const m of seedMeetups) {
-        if (!isMeetupHidden(m.id)) byId.set(m.id, m);
-      }
-    }
     return [...byId.values()];
-  }, [remoteMeetups, createdAsHosted, seedMeetups, isMeetupHidden]);
+  }, [remoteMeetups, createdAsHosted, isMeetupHidden]);
 
   useEffect(() => {
     if (!hydrated) return;

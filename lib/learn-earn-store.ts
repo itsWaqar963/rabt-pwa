@@ -1,8 +1,4 @@
-import {
-  DEFAULT_COMPLETED_IDS,
-  SEED_LESSONS,
-  type LearnLesson,
-} from "@/lib/learn-earn-lessons";
+import { SEED_LESSONS, type LearnLesson } from "@/lib/learn-earn-lessons";
 
 export const COMPLETED_KEY = "rabt_learn_completed";
 
@@ -21,13 +17,8 @@ function parseStringArray(raw: string | null): string[] {
 }
 
 export function loadCompletedIds(): string[] {
-  if (typeof window === "undefined") return [...DEFAULT_COMPLETED_IDS];
-  const stored = parseStringArray(localStorage.getItem(COMPLETED_KEY));
-  if (stored.length === 0) {
-    localStorage.setItem(COMPLETED_KEY, JSON.stringify(DEFAULT_COMPLETED_IDS));
-    return [...DEFAULT_COMPLETED_IDS];
-  }
-  return stored;
+  if (typeof window === "undefined") return [];
+  return parseStringArray(localStorage.getItem(COMPLETED_KEY));
 }
 
 export function saveCompletedIds(ids: string[]): void {

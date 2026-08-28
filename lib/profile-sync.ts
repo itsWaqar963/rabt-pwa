@@ -34,11 +34,12 @@ export type ProfileRow = {
   age_group: string | null;
   city: string | null;
   country: string | null;
+  xp: number | null;
   updated_at: string | null;
 };
 
 const PROFILE_COLUMNS =
-  "id, full_name, email, avatar_url, active_intent, skills, social_urls, introvert_extrovert, subline, is_ims_student, is_source_code_academia, last_seen_at, gender, age_group, city, country, updated_at";
+  "id, full_name, email, avatar_url, active_intent, skills, social_urls, introvert_extrovert, subline, is_ims_student, is_source_code_academia, last_seen_at, gender, age_group, city, country, xp, updated_at";
 
 function clampScore(score: number): number {
   return Math.min(10, Math.max(1, Math.round(score)));
@@ -91,6 +92,7 @@ export function mergeRemoteEditable(
         : local.ageGroup,
     city: typeof row.city === "string" ? row.city : local.city,
     country: typeof row.country === "string" ? row.country : local.country,
+    xp: typeof row.xp === "number" ? Math.max(0, Math.round(row.xp)) : local.xp,
   };
 }
 
@@ -155,6 +157,7 @@ export async function saveProfileRemote(
       age_group: profile.ageGroup,
       city: profile.city,
       country: profile.country,
+      xp: Math.max(0, Math.round(profile.xp)),
       updated_at: new Date().toISOString(),
     };
     if (identity) {
@@ -171,5 +174,33 @@ export async function saveProfileRemote(
     if (error) logRemoteError("saveProfileRemote", error);
   } catch (error) {
     logRemoteError("saveProfileRemote", error);
+  }
+}
+
+export async function incrementProfileXp(
+  userId: string,
+  amount: number,
+): Promise<number | null> {
+  if (!isSupabaseConfigured || amount <= 0) return null;
+  try {
+    const row = await fetchProfileRow(userId);
+    const current =
+      row && typeof row.xp === "number" ? Math.max(0, Math.round(row.xp)) : 0;
+    const next = current + amount;
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        xp: next,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId);
+    if (error) {
+      logRemoteError("incrementProfileXp", error);
+      return null;
+    }
+    return next;
+  } catch (error) {
+    logRemoteError("incrementProfileXp", error);
+    return null;
   }
 }

@@ -17,7 +17,6 @@ import {
   type DiscoveryFilters,
 } from "@/lib/discovery-filters";
 import {
-  DISCOVERY_USERS,
   filterDiscoveryUsers,
   findDiscoveryUser,
   hostedMeetupToDiscoveryUser,
@@ -67,11 +66,9 @@ export default function DiscoverPage() {
   }, []);
 
   const sourceUsers = useMemo((): DiscoveryUser[] => {
-    const remoteUsers = remoteMeetups
+    return remoteMeetups
       .filter((m) => !isMeetupHidden(m.id))
       .map(hostedMeetupToDiscoveryUser);
-    if (remoteUsers.length > 0) return remoteUsers;
-    return DISCOVERY_USERS;
   }, [remoteMeetups, isMeetupHidden]);
 
   const feed = useMemo(

@@ -23,6 +23,7 @@ export type ProfileData = {
   skills: string[];
   socialUrls: SocialUrls;
   introvertExtrovert: number;
+  xp: number;
   gender: ProfileGender;
   ageGroup: ProfileAgeGroup;
   city: string;
@@ -39,6 +40,7 @@ export const DEFAULT_PROFILE: ProfileData = {
   skills: [],
   socialUrls: { ...EMPTY_SOCIAL_URLS },
   introvertExtrovert: 5,
+  xp: 0,
   gender: "",
   ageGroup: "",
   city: "",
@@ -137,8 +139,12 @@ export function clusterSignalItems(profile: ProfileData): {
   ];
 }
 
-const DUMMY_PROFILE_NAME = "Sana Khalid";
 const LATIN_LETTER = /[A-Za-z]/;
+
+function parseXp(raw: unknown): number {
+  if (typeof raw !== "number" || !Number.isFinite(raw)) return 0;
+  return Math.max(0, Math.round(raw));
+}
 
 /** First letters of up to 2 Latin words; otherwise first character (Arabic / other). */
 export function initialsFromName(fullName: string): string {
@@ -196,12 +202,10 @@ function parseProfile(raw: string | null): ProfileData {
     const row = parsed as Record<string, unknown>;
     const rawName =
       typeof row.name === "string" ? row.name : DEFAULT_PROFILE.name;
-    const isDummy = rawName === DUMMY_PROFILE_NAME;
     return {
-      name: isDummy ? DEFAULT_PROFILE.name : rawName,
-      initial: isDummy
-        ? DEFAULT_PROFILE.initial
-        : typeof row.initial === "string"
+      name: rawName,
+      initial:
+        typeof row.initial === "string"
           ? row.initial
           : DEFAULT_PROFILE.initial,
       subline:
@@ -229,6 +233,7 @@ function parseProfile(raw: string | null): ProfileData {
         typeof row.introvertExtrovert === "number"
           ? clampScore(row.introvertExtrovert)
           : DEFAULT_PROFILE.introvertExtrovert,
+      xp: parseXp(row.xp),
       gender: parseProfileGender(row.gender),
       ageGroup: parseProfileAgeGroup(row.ageGroup),
       city: typeof row.city === "string" ? row.city : DEFAULT_PROFILE.city,

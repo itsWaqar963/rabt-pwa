@@ -1,31 +1,49 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { AuthGuard } from "@/components/auth/AuthGuard";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { LearnEarnSection } from "@/components/ui/LearnEarnSection";
 import { ProfileHeaderButton } from "@/components/ui/ProfileHeaderButton";
-import { ReflectionCard } from "@/components/ui/ReflectionCard";
-
-const REVIEWS = [
-  {
-    id: "sana",
-    avatar: "س",
-    title: "Meetup with Sana Khalid",
-    date: "18 Aug",
-    location: "Model Town Park, Lahore",
-    memberCount: 3,
-  },
-  {
-    id: "hamza",
-    avatar: "ح",
-    title: "Sunday Civic Tech Walk",
-    date: "11 Aug",
-    location: "Racecourse Park, Lahore",
-    memberCount: 5,
-  },
-] as const;
+import { useAuth } from "@/context/AuthContext";
+import {
+  loadProfile,
+  overlayAuthIdentity,
+  saveProfile,
+  type ProfileData,
+} from "@/lib/profile-store";
+import { fetchProfileRow, mergeRemoteEditable } from "@/lib/profile-sync";
 
 export default function ReflectPage() {
+  const { user } = useAuth();
+  const [xpTotal, setXpTotal] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadXp() {
+      let profile: ProfileData = overlayAuthIdentity(loadProfile(), user);
+      if (user) {
+        try {
+          const row = await fetchProfileRow(user.id);
+          if (cancelled) return;
+          if (row) {
+            profile = overlayAuthIdentity(mergeRemoteEditable(profile, row), user);
+            saveProfile(profile);
+          }
+        } catch {
+          /* keep local */
+        }
+      }
+      if (!cancelled) setXpTotal(profile.xp);
+    }
+
+    void loadXp();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
   return (
     <AuthGuard>
     <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_80%_4%,color-mix(in_oklch,var(--muted)_9%,transparent),transparent_20rem),var(--bg)]">
@@ -74,20 +92,20 @@ export default function ReflectPage() {
             </div>
             <div
               className="flex size-[62px] shrink-0 flex-col items-center justify-center rounded-full border border-[color-mix(in_oklch,var(--accent)_62%,var(--border))] bg-[color-mix(in_oklch,var(--accent)_10%,var(--surface))] text-center shadow-[0_0_0_1px_color-mix(in_oklch,var(--accent)_20%,transparent),0_0_22px_color-mix(in_oklch,var(--accent)_28%,transparent)]"
-              aria-label="Trust rating 4.9 out of 5"
+              aria-label="Trust rating not available yet"
             >
-              <span className="font-mono text-[15px] font-bold leading-none text-accent">
-                4.9
+              <span className="font-mono text-[15px] font-bold leading-none text-muted">
+                —
               </span>
               <span className="mt-1 font-mono text-[7px] uppercase leading-none tracking-[0.06em] text-muted">
-                / 5
+                Beta
               </span>
             </div>
           </div>
           <div className="mt-[17px] grid grid-cols-3 gap-2 border-t border-[color-mix(in_oklch,var(--border)_78%,transparent)] pt-3.5">
             <div>
               <strong className="block font-mono text-lg font-semibold text-foreground">
-                12
+                0
               </strong>
               <span className="mt-[3px] block text-[9px] text-muted">
                 Completed meetups
@@ -95,15 +113,15 @@ export default function ReflectPage() {
             </div>
             <div>
               <strong className="block font-mono text-lg font-semibold text-foreground">
-                860
+                {xpTotal}
               </strong>
               <span className="mt-[3px] block text-[9px] text-muted">
                 Total XP
               </span>
             </div>
             <div>
-              <strong className="block font-mono text-lg font-semibold text-foreground">
-                96%
+              <strong className="block font-mono text-lg font-semibold text-muted">
+                —
               </strong>
               <span className="mt-[3px] block text-[9px] text-muted">
                 Show-up rate
@@ -119,14 +137,10 @@ export default function ReflectPage() {
             <h2 className="font-display text-[21px] text-foreground">
               Close the loop
             </h2>
-            <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
-              2 waiting
-            </span>
           </div>
-          <div className="grid gap-3 pb-2">
-            {REVIEWS.map((review) => (
-              <ReflectionCard key={review.id} {...review} />
-            ))}
+          <div className="border border-dashed border-border px-5 py-8 text-center text-xs text-muted">
+            No pending reviews yet. After your first meetup, you can verify
+            attendance and leave feedback here.
           </div>
         </section>
       </main>

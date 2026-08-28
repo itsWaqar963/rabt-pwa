@@ -26,10 +26,10 @@ import {
   fetchProfileRow,
   mergeRemoteEditable,
   saveProfileRemote,
+  type ProfileRow,
 } from "@/lib/profile-sync";
 import { getConfiguredSocialLinks } from "@/lib/social-links";
-
-const XP_TOTAL = 860;
+import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 export default function ProfilePage() {
   const reducedMotion = useReducedMotion();
@@ -78,6 +78,35 @@ export default function ProfilePage() {
     void hydrate();
     return () => {
       cancelled = true;
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user?.id || !isSupabaseConfigured) return;
+
+    const channel = supabase
+      .channel(`rabt-profile-${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "profiles",
+          filter: `id=eq.${user.id}`,
+        },
+        (payload) => {
+          const row = payload.new as ProfileRow;
+          setProfile((prev) => {
+            const next = overlayAuthIdentity(mergeRemoteEditable(prev, row), user);
+            saveProfile(next);
+            return next;
+          });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
     };
   }, [user]);
 
@@ -135,7 +164,7 @@ export default function ProfilePage() {
             </button>
             <button
               type="button"
-              aria-label={`Show ${XP_TOTAL} total XP`}
+              aria-label={`Show ${profile.xp} total XP`}
               onClick={showXpToast}
               className="flex min-h-11 items-center gap-2 rounded-full border border-[color-mix(in_oklch,var(--accent)_48%,var(--border))] bg-[color-mix(in_oklch,var(--accent)_9%,var(--surface))] px-3 text-foreground transition-[border-color,background,transform] duration-150 hover:border-accent hover:bg-[color-mix(in_oklch,var(--accent)_14%,transparent)] active:scale-[0.97]"
             >
@@ -146,7 +175,7 @@ export default function ProfilePage() {
               <span className="font-mono text-[9px] uppercase tracking-[0.08em] text-muted">
                 XP
               </span>
-              <span className="font-mono text-xs font-bold">{XP_TOTAL}</span>
+              <span className="font-mono text-xs font-bold">{profile.xp}</span>
             </button>
           </div>
         </header>
@@ -354,8 +383,8 @@ export default function ProfilePage() {
                   Reliability, reflected.
                 </h2>
               </div>
-              <div className="text-right font-mono text-xl font-bold text-accent">
-                4.9
+              <div className="text-right font-mono text-xl font-bold text-muted">
+                —
                 <small className="mt-0.5 block text-[9px] font-normal text-muted">
                   / 5 trust rating
                 </small>
@@ -364,15 +393,15 @@ export default function ProfilePage() {
             <div className="mt-[17px] grid grid-cols-2 gap-2 border-t border-[color-mix(in_oklch,var(--border)_78%,transparent)] pt-3.5">
               <div>
                 <strong className="block font-mono text-lg text-foreground">
-                  12
+                  0
                 </strong>
                 <span className="mt-[3px] block text-[9px] text-muted">
                   Completed meetups
                 </span>
               </div>
               <div>
-                <strong className="block font-mono text-lg text-foreground">
-                  96%
+                <strong className="block font-mono text-lg text-muted">
+                  —
                 </strong>
                 <span className="mt-[3px] block text-[9px] text-muted">
                   Show-up rate
@@ -404,7 +433,7 @@ export default function ProfilePage() {
             : "pointer-events-none opacity-0"
         }`}
       >
-        {XP_TOTAL} XP earned through showing up.
+        {profile.xp} XP earned through showing up.
       </div>
 
       {hydrated ? (

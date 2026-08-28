@@ -20,7 +20,16 @@ import {
   submitLessonContribution,
   type LessonContribution,
 } from "@/lib/moderation-sync";
+import {
+  incrementProfileXp,
+} from "@/lib/profile-sync";
+import {
+  loadProfile,
+  saveProfile,
+} from "@/lib/profile-store";
 import { isSupabaseConfigured } from "@/lib/supabase";
+
+const LESSON_XP_REWARD = 50;
 
 function LessonThumbPlaceholder() {
   return (
@@ -158,8 +167,16 @@ export function LearnEarnSection() {
       setQuizOpen(false);
       setActiveLesson(null);
       setShowXp(true);
+
+      if (userId) {
+        void incrementProfileXp(userId, LESSON_XP_REWARD).then((nextXp) => {
+          if (nextXp === null) return;
+          const profile = loadProfile();
+          saveProfile({ ...profile, xp: nextXp });
+        });
+      }
     },
-    [],
+    [userId],
   );
 
   async function handleContribute(input: {
@@ -313,7 +330,7 @@ export function LearnEarnSection() {
 
       {showXp ? (
         <XpReward
-          amount={50}
+          amount={LESSON_XP_REWARD}
           onComplete={() => setShowXp(false)}
         />
       ) : null}
