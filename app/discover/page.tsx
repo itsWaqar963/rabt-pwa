@@ -23,9 +23,12 @@ import {
   hostedMeetupToDiscoveryUser,
   type DiscoveryUser,
 } from "@/lib/discovery-users";
+import { ScreenPhilosophyHeader } from "@/components/ui/ScreenPhilosophyHeader";
+import { useScreenTagline } from "@/lib/cms-taglines";
 import { isMeetupLive } from "@/lib/meetup-lifecycle";
 
 export default function DiscoverPage() {
+  const tagline = useScreenTagline("discover");
   const { user: authUser } = useAuth();
   const [filters, setFilters] = useState<DiscoveryFilters>(DEFAULT_FILTERS);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -119,19 +122,13 @@ export default function DiscoverPage() {
           <ProfileHeaderButton />
         </header>
 
-        <section className="flex items-end justify-between gap-4 px-0.5 pb-[19px] pt-[27px]">
-          <div>
-            <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
-              Home · 01
-            </p>
-            <h1 className="mt-1 max-w-[10ch] font-display text-[31px] leading-[1.08] text-foreground max-[360px]:text-[28px]">
-              Find your <span className="text-accent">cluster.</span>
-            </h1>
-          </div>
-          <p className="max-w-[17ch] text-right text-xs leading-[1.55] text-muted">
-            Real people. Shared intent. A reason to meet offline.
-          </p>
-        </section>
+        <ScreenPhilosophyHeader
+          eyebrow="Home · 01"
+          titleLead={tagline.title_lead}
+          titleAccent={tagline.title_accent}
+          subtitle={tagline.subtitle}
+          layout="split"
+        />
 
         <div ref={filterSentinelRef} aria-hidden className="h-px w-full shrink-0" />
         <section

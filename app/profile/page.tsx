@@ -22,6 +22,8 @@ import {
   saveProfile,
   type ProfileData,
 } from "@/lib/profile-store";
+import { ScreenPhilosophyHeader } from "@/components/ui/ScreenPhilosophyHeader";
+import { useScreenTagline } from "@/lib/cms-taglines";
 import {
   fetchProfileRow,
   mergeRemoteEditable,
@@ -32,6 +34,7 @@ import { getConfiguredSocialLinks } from "@/lib/social-links";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 export default function ProfilePage() {
+  const tagline = useScreenTagline("profile");
   const reducedMotion = useReducedMotion();
   const { user } = useAuth();
   const [profile, setProfile] = useState<ProfileData>(DEFAULT_PROFILE);
@@ -180,18 +183,12 @@ export default function ProfilePage() {
           </div>
         </header>
 
-        <section className="px-0.5 pb-[17px] pt-[27px]">
-          <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
-            Your growth card · 04
-          </p>
-          <h1 className="mt-1 max-w-[12ch] font-display text-[32px] leading-[1.08] text-foreground max-[360px]:text-[29px]">
-            Show up as <span className="text-accent">yourself.</span>
-          </h1>
-          <p className="mt-2.5 max-w-[34ch] text-xs leading-[1.58] text-muted">
-            A clear signal for people who want to turn shared intent into real
-            local connection.
-          </p>
-        </section>
+        <ScreenPhilosophyHeader
+          eyebrow="Your growth card · 04"
+          titleLead={tagline.title_lead}
+          titleAccent={tagline.title_accent}
+          subtitle={tagline.subtitle}
+        />
 
         <section className="rounded-[22px] border border-[color-mix(in_oklch,var(--accent)_48%,var(--border))] bg-[linear-gradient(140deg,color-mix(in_oklch,var(--accent)_10%,var(--surface)),var(--surface))] p-4 shadow-[0_20px_55px_color-mix(in_oklch,var(--bg)_78%,transparent)]">
           <div className="mb-3 flex justify-end">

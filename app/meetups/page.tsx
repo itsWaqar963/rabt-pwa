@@ -19,6 +19,8 @@ import {
   type DiscoveryFilters,
 } from "@/lib/discovery-filters";
 import { type HostedMeetup } from "@/lib/discovery-users";
+import { ScreenPhilosophyHeader } from "@/components/ui/ScreenPhilosophyHeader";
+import { useScreenTagline } from "@/lib/cms-taglines";
 import { isMeetupLive } from "@/lib/meetup-lifecycle";
 import {
   countAcceptedRequesters,
@@ -90,6 +92,7 @@ export default function MeetupsPage() {
 }
 
 function MeetupsPageContent() {
+  const tagline = useScreenTagline("meetups");
   const [activeTab, setActiveTab] = useState<Tab>("explore");
   const [createOpen, setCreateOpen] = useState(false);
   const [filters, setFilters] = useState<DiscoveryFilters>(DEFAULT_FILTERS);
@@ -249,18 +252,12 @@ function MeetupsPageContent() {
           </div>
         </header>
 
-        <section className="px-0.5 pb-5 pt-[27px]">
-          <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
-            Offline · 02
-          </p>
-          <h1 className="mt-1 max-w-[12ch] font-display text-[31px] leading-[1.08] text-foreground max-[360px]:text-[28px]">
-            Meet with <span className="text-accent">intent.</span>
-          </h1>
-          <p className="mt-[11px] max-w-[34ch] text-xs leading-[1.55] text-muted">
-            Small gatherings for useful conversations, shared practice, and a
-            reason to show up.
-          </p>
-        </section>
+        <ScreenPhilosophyHeader
+          eyebrow="Offline · 02"
+          titleLead={tagline.title_lead}
+          titleAccent={tagline.title_accent}
+          subtitle={tagline.subtitle}
+        />
 
         <section
           role="tablist"

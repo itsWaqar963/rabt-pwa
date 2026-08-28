@@ -12,9 +12,12 @@ import {
   saveProfile,
   type ProfileData,
 } from "@/lib/profile-store";
+import { ScreenPhilosophyHeader } from "@/components/ui/ScreenPhilosophyHeader";
+import { useScreenTagline } from "@/lib/cms-taglines";
 import { fetchProfileRow, mergeRemoteEditable } from "@/lib/profile-sync";
 
 export default function ReflectPage() {
+  const tagline = useScreenTagline("reflect");
   const { user } = useAuth();
   const [xpTotal, setXpTotal] = useState(0);
 
@@ -67,18 +70,12 @@ export default function ReflectPage() {
           <ProfileHeaderButton ariaLabel="Open profile" />
         </header>
 
-        <section className="px-0.5 pb-[18px] pt-[27px]">
-          <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
-            After the gathering · 03
-          </p>
-          <h1 className="mt-1 max-w-[13ch] font-display text-[32px] leading-[1.08] text-foreground max-[360px]:text-[29px]">
-            Reflect <span className="text-accent">&amp; grow.</span>
-          </h1>
-          <p className="mt-[11px] max-w-[35ch] text-xs leading-[1.58] text-muted">
-            Verify your physical meetups, build community trust, and claim your
-            growth XP.
-          </p>
-        </section>
+        <ScreenPhilosophyHeader
+          eyebrow="After the gathering · 03"
+          titleLead={tagline.title_lead}
+          titleAccent={tagline.title_accent}
+          subtitle={tagline.subtitle}
+        />
 
         <section className="rounded-[18px] border border-[color-mix(in_oklch,var(--accent)_46%,var(--border))] bg-[linear-gradient(140deg,color-mix(in_oklch,var(--accent)_10%,var(--surface)),var(--surface))] p-4 shadow-[0_18px_46px_color-mix(in_oklch,var(--bg)_72%,transparent)]">
           <div className="flex items-center justify-between gap-4">
