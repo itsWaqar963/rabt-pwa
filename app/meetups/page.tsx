@@ -19,6 +19,7 @@ import {
   type DiscoveryFilters,
 } from "@/lib/discovery-filters";
 import { type HostedMeetup } from "@/lib/discovery-users";
+import { isMeetupLive } from "@/lib/meetup-lifecycle";
 import {
   countAcceptedRequesters,
   createdMeetupToHosted,
@@ -160,7 +161,10 @@ function MeetupsPageContent() {
   ]);
 
   const exploreMeetups = useMemo(
-    () => filterHostedMeetups(allExplore, filters.country, filters.city),
+    () =>
+      filterHostedMeetups(allExplore, filters.country, filters.city).filter(
+        (m) => isMeetupLive(m.date, m.time),
+      ),
     [allExplore, filters.country, filters.city],
   );
 

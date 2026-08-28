@@ -10,6 +10,7 @@ import { FilterPills } from "@/components/ui/FilterPills";
 import { ProfileHeaderButton } from "@/components/ui/ProfileHeaderButton";
 import { ProfilePopup } from "@/components/ui/ProfilePopup";
 import { UserCard } from "@/components/ui/UserCard";
+import { useAuth } from "@/context/AuthContext";
 import {
   DEFAULT_FILTERS,
   getFilterLabel,
@@ -22,8 +23,10 @@ import {
   hostedMeetupToDiscoveryUser,
   type DiscoveryUser,
 } from "@/lib/discovery-users";
+import { isMeetupLive } from "@/lib/meetup-lifecycle";
 
 export default function DiscoverPage() {
+  const { user: authUser } = useAuth();
   const [filters, setFilters] = useState<DiscoveryFilters>(DEFAULT_FILTERS);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [filterBarStuck, setFilterBarStuck] = useState(false);
@@ -37,6 +40,7 @@ export default function DiscoverPage() {
     toggleMeetupRequest,
     toggleConnect,
     hideUser,
+    hideMeetup,
     isUserHidden,
     isMeetupHidden,
   } = useMeetupStore();
@@ -68,14 +72,20 @@ export default function DiscoverPage() {
   const sourceUsers = useMemo((): DiscoveryUser[] => {
     return remoteMeetups
       .filter((m) => !isMeetupHidden(m.id))
+      .filter((m) => isMeetupLive(m.date, m.time))
       .map(hostedMeetupToDiscoveryUser);
   }, [remoteMeetups, isMeetupHidden]);
 
   const feed = useMemo(
     () =>
       filterDiscoveryUsers(sourceUsers, filters).filter((user) => {
-        if (isUserHidden(user.id)) return false;
-        if (user.meetup && isMeetupHidden(user.meetup.id)) return false;
+        const hostId = user.hostUserId ?? user.id;
+        if (user.meetup) {
+          if (isMeetupHidden(user.meetup.id)) return false;
+          if (isUserHidden(hostId)) return false;
+        } else if (isUserHidden(hostId)) {
+          return false;
+        }
         return true;
       }),
     [sourceUsers, filters, isUserHidden, isMeetupHidden],
@@ -161,7 +171,13 @@ export default function DiscoverPage() {
             ) : feed.length === 0 ? (
               <EmptyClusters onReset={() => setFilters(DEFAULT_FILTERS)} />
             ) : (
-              feed.map((user) => (
+              feed.map((user) => {
+                const isHost = Boolean(
+                  authUser?.id &&
+                    user.hostUserId &&
+                    user.hostUserId === authUser.id,
+                );
+                return (
                 <UserCard
                   key={user.id}
                   name={user.name}
@@ -181,6 +197,7 @@ export default function DiscoverPage() {
                   isVsila={user.isVsila}
                   customAffiliation={user.customAffiliation}
                   isOnline={user.isOnline === true}
+                  hidePrimaryAction={Boolean(user.meetup && isHost)}
                   primaryAcked={
                     user.meetup
                       ? isMeetupRequested(user.meetup.id)
@@ -191,11 +208,16 @@ export default function DiscoverPage() {
                   }
                   onViewProfile={() => setSelectedUserId(user.id)}
                   onHide={() => {
-                    hideUser(user.id);
+                    if (user.meetup) {
+                      hideMeetup(user.meetup.id);
+                    } else {
+                      hideUser(user.hostUserId ?? user.id);
+                    }
                     if (selectedUserId === user.id) setSelectedUserId(null);
                   }}
                 />
-              ))
+              );
+              })
             )}
           </div>
         </section>
@@ -211,7 +233,11 @@ export default function DiscoverPage() {
         onHide={
           selectedUser
             ? () => {
-                hideUser(selectedUser.id);
+                if (selectedUser.meetup) {
+                  hideMeetup(selectedUser.meetup.id);
+                } else {
+                  hideUser(selectedUser.hostUserId ?? selectedUser.id);
+                }
                 setSelectedUserId(null);
               }
             : undefined

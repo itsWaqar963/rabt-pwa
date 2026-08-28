@@ -25,6 +25,7 @@ export type DiscoveryMeetup = {
 
 export type DiscoveryUser = UserCardProps & {
   id: string;
+  hostUserId?: string;
   country: string;
   city: string;
   gender: "women" | "men";
@@ -129,7 +130,7 @@ export function getHostedMeetups(users: DiscoveryUser[]): HostedMeetup[] {
         when: user.meetup.when,
         organizerName: user.name,
         organizerRole: role,
-        hostUserId: user.id,
+        hostUserId: user.hostUserId ?? user.id,
         spotsLeft: user.meetup.spotsLeft,
         city: user.city,
         country: user.country,
@@ -161,6 +162,7 @@ export function hostedMeetupToDiscoveryUser(
 
   return {
     id: meetup.id,
+    hostUserId: meetup.hostUserId,
     name,
     initial: meetup.hostInitial || name.charAt(0) || "?",
     avatarUrl: meetup.hostAvatarUrl,

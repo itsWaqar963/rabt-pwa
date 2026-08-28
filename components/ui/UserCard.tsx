@@ -31,6 +31,7 @@ export type UserCardProps = {
   countryLabel?: string;
   meetup?: UserCardMeetup;
   primaryAcked?: boolean;
+  hidePrimaryAction?: boolean;
   onPrimaryAction?: () => void;
   onViewProfile?: () => void;
   onHide?: () => void;
@@ -67,6 +68,7 @@ export function UserCard({
   countryLabel,
   meetup,
   primaryAcked = false,
+  hidePrimaryAction = false,
   onPrimaryAction,
   onViewProfile,
   onHide,
@@ -262,7 +264,7 @@ export function UserCard({
       </div>
 
       <div className="mt-3.5 flex gap-2">
-        {onPrimaryAction ? (
+        {onPrimaryAction && !hidePrimaryAction ? (
           <button
             type="button"
             onClick={onPrimaryAction}
