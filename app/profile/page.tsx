@@ -233,6 +233,8 @@ export default function ProfilePage() {
                 <AffiliationBadges
                   isImsStudent={profile.isImsStudent}
                   isSourceCodeAcademia={profile.isSourceCodeAcademia}
+                  isVsila={profile.isVsila}
+                  customAffiliation={profile.customAffiliation}
                 />
               </div>
               <p className="mt-1 text-[11px] text-muted">{profile.subline}</p>

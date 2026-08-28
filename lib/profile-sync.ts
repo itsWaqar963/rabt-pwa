@@ -29,6 +29,8 @@ export type ProfileRow = {
   subline: string | null;
   is_ims_student: boolean | null;
   is_source_code_academia: boolean | null;
+  is_vsila: boolean | null;
+  custom_affiliation: string | null;
   last_seen_at: string | null;
   gender: string | null;
   age_group: string | null;
@@ -39,7 +41,7 @@ export type ProfileRow = {
 };
 
 const PROFILE_COLUMNS =
-  "id, full_name, email, avatar_url, active_intent, skills, social_urls, introvert_extrovert, subline, is_ims_student, is_source_code_academia, last_seen_at, gender, age_group, city, country, xp, updated_at";
+  "id, full_name, email, avatar_url, active_intent, skills, social_urls, introvert_extrovert, subline, is_ims_student, is_source_code_academia, is_vsila, custom_affiliation, last_seen_at, gender, age_group, city, country, xp, updated_at";
 
 function clampScore(score: number): number {
   return Math.min(10, Math.max(1, Math.round(score)));
@@ -82,6 +84,12 @@ export function mergeRemoteEditable(
       typeof row.is_source_code_academia === "boolean"
         ? row.is_source_code_academia
         : local.isSourceCodeAcademia,
+    isVsila:
+      typeof row.is_vsila === "boolean" ? row.is_vsila : local.isVsila,
+    customAffiliation:
+      typeof row.custom_affiliation === "string"
+        ? row.custom_affiliation
+        : local.customAffiliation,
     gender:
       typeof row.gender === "string"
         ? parseProfileGender(row.gender)
@@ -153,6 +161,8 @@ export async function saveProfileRemote(
       subline: profile.subline,
       is_ims_student: profile.isImsStudent,
       is_source_code_academia: profile.isSourceCodeAcademia,
+      is_vsila: profile.isVsila,
+      custom_affiliation: profile.customAffiliation || null,
       gender: profile.gender,
       age_group: profile.ageGroup,
       city: profile.city,

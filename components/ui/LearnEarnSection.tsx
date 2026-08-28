@@ -30,6 +30,7 @@ import {
 import { isSupabaseConfigured } from "@/lib/supabase";
 
 const LESSON_XP_REWARD = 50;
+const PAGE_SIZE = 20;
 
 function LessonThumbPlaceholder() {
   return (
@@ -117,6 +118,7 @@ export function LearnEarnSection() {
   const [quizOpen, setQuizOpen] = useState(false);
   const [contributeOpen, setContributeOpen] = useState(false);
   const [completedOpen, setCompletedOpen] = useState(false);
+  const [visiblePendingCount, setVisiblePendingCount] = useState(PAGE_SIZE);
   const [showXp, setShowXp] = useState(false);
   const [submitAck, setSubmitAck] = useState(false);
 
@@ -151,6 +153,9 @@ export function LearnEarnSection() {
   );
 
   const completedCount = completed.length;
+  const total = pending.length + completed.length;
+  const visiblePending = pending.slice(0, visiblePendingCount);
+  const hasMorePending = pending.length > visiblePendingCount;
   const progressPct = Math.min(
     100,
     (completedCount / DAILY_QUIZ_GOAL) * 100,
@@ -224,7 +229,10 @@ export function LearnEarnSection() {
         </div>
 
         <div className="mt-3.5">
-          <div className="flex items-center justify-between gap-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted">
+            Total Available Questions: {total} | Completed: {completedCount}
+          </p>
+          <div className="mt-2.5 flex items-center justify-between gap-2">
             <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted">
               Daily Quizzes: {completedCount}/{DAILY_QUIZ_GOAL} Completed
             </p>
@@ -246,7 +254,7 @@ export function LearnEarnSection() {
         </div>
 
         <div className="-mx-1 mt-4 flex gap-3 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {pending.map((lesson) => (
+          {visiblePending.map((lesson) => (
             <LessonThumb
               key={lesson.id}
               lesson={lesson}
@@ -256,19 +264,28 @@ export function LearnEarnSection() {
               }}
             />
           ))}
+        </div>
+
+        {hasMorePending ? (
           <button
             type="button"
-            onClick={() => setContributeOpen(true)}
-            className="flex w-[108px] shrink-0 flex-col items-center justify-center gap-2 rounded-[16px] border border-dashed border-[color-mix(in_oklch,var(--accent)_45%,var(--border))] bg-black/30 px-2 py-4 text-center transition-[border-color,background] duration-150 hover:border-accent hover:bg-[color-mix(in_oklch,var(--accent)_8%,transparent)]"
+            onClick={() =>
+              setVisiblePendingCount((count) => count + PAGE_SIZE)
+            }
+            className="mt-2 w-full py-2 text-center font-mono text-[10px] uppercase tracking-[0.08em] text-accent transition-colors hover:text-foreground"
           >
-            <span className="grid size-9 place-items-center rounded-full border border-[color-mix(in_oklch,var(--accent)_55%,var(--border))] text-accent">
-              <Plus className="size-4" aria-hidden />
-            </span>
-            <span className="text-[10px] font-semibold leading-[1.35] text-foreground">
-              Contribute a Lesson
-            </span>
+            See more
           </button>
-        </div>
+        ) : null}
+
+        <button
+          type="button"
+          onClick={() => setContributeOpen(true)}
+          className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[12px] border border-dashed border-[color-mix(in_oklch,var(--accent)_45%,var(--border))] bg-black/30 px-3 text-sm font-semibold text-foreground transition-[border-color,background] duration-150 hover:border-accent hover:bg-[color-mix(in_oklch,var(--accent)_8%,transparent)]"
+        >
+          <Plus className="size-4 text-accent" aria-hidden />
+          Contribute a Lesson
+        </button>
 
         {completed.length > 0 ? (
           <div className="mt-4 border-t border-[color-mix(in_oklch,var(--border)_78%,transparent)] pt-3">

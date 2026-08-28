@@ -15,10 +15,11 @@ import {
 } from "@/lib/profile-store";
 import { withJwtRetry } from "@/lib/auth-retry";
 import { isProfileOnline } from "@/lib/presence";
+import { normalizeSocialUrls } from "@/lib/social-links";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 const HOST_PROFILE_COLS =
-  "id, full_name, avatar_url, subline, city, country, gender, age_group, active_intent, skills, introvert_extrovert, is_ims_student, is_source_code_academia, last_seen_at";
+  "id, full_name, avatar_url, subline, city, country, gender, age_group, active_intent, skills, introvert_extrovert, is_ims_student, is_source_code_academia, is_vsila, custom_affiliation, social_urls, last_seen_at";
 
 type HostProfileRow = {
   id: string;
@@ -34,6 +35,9 @@ type HostProfileRow = {
   introvert_extrovert: number | null;
   is_ims_student: boolean | null;
   is_source_code_academia: boolean | null;
+  is_vsila: boolean | null;
+  custom_affiliation: string | null;
+  social_urls: unknown;
   last_seen_at: string | null;
 };
 
@@ -184,6 +188,12 @@ export function mapMeetupRowToHosted(
     hostIntrovertExtrovert: introvert,
     hostIsImsStudent: host?.is_ims_student === true,
     hostIsSourceCodeAcademia: host?.is_source_code_academia === true,
+    hostIsVsila: host?.is_vsila === true,
+    hostCustomAffiliation: host?.custom_affiliation?.trim() || undefined,
+    hostSocialUrls:
+      host?.social_urls != null
+        ? normalizeSocialUrls(host.social_urls)
+        : undefined,
     hostLastSeenAt: host?.last_seen_at ?? undefined,
     hostIsOnline: isProfileOnline(host?.last_seen_at),
     date,

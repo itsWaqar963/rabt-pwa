@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { LogOut, X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { validateCustomAffiliation } from "@/lib/affiliations";
 import type { ProfileData } from "@/lib/profile-store";
 import {
   hasPushSubscription,
@@ -20,6 +21,8 @@ export type ProfileSettingsModalProps = {
   onSaveAffiliations?: (patch: {
     isImsStudent: boolean;
     isSourceCodeAcademia: boolean;
+    isVsila: boolean;
+    customAffiliation: string;
   }) => void;
 };
 
@@ -68,6 +71,11 @@ export function ProfileSettingsModal({
   const [isSourceCodeAcademia, setIsSourceCodeAcademia] = useState(
     profile?.isSourceCodeAcademia ?? false,
   );
+  const [isVsila, setIsVsila] = useState(profile?.isVsila ?? false);
+  const [customAffiliation, setCustomAffiliation] = useState(
+    profile?.customAffiliation ?? "",
+  );
+  const [customError, setCustomError] = useState<string | null>(null);
 
   const syncNotificationPref = useCallback(async () => {
     if (typeof Notification === "undefined" || !isVapidPublicConfigured()) {
@@ -149,6 +157,9 @@ export function ProfileSettingsModal({
     if (!open || !profile) return;
     setIsImsStudent(profile.isImsStudent);
     setIsSourceCodeAcademia(profile.isSourceCodeAcademia);
+    setIsVsila(profile.isVsila);
+    setCustomAffiliation(profile.customAffiliation);
+    setCustomError(null);
   }, [open, profile]);
 
   useEffect(() => {
@@ -178,11 +189,36 @@ export function ProfileSettingsModal({
 
   const duration = reducedMotion ? 0.01 : 0.28;
 
-  function persistAffiliations(nextIms: boolean, nextSca: boolean) {
+  function persistAffiliations(
+    nextIms: boolean,
+    nextSca: boolean,
+    nextVsila: boolean,
+    nextCustom: string,
+  ) {
     onSaveAffiliations?.({
       isImsStudent: nextIms,
       isSourceCodeAcademia: nextSca,
+      isVsila: nextVsila,
+      customAffiliation: nextCustom,
     });
+  }
+
+  function handleCustomBlur() {
+    const result = validateCustomAffiliation(customAffiliation);
+    if (!result.ok) {
+      setCustomError(result.error);
+      return;
+    }
+    setCustomError(null);
+    if (result.value !== customAffiliation) {
+      setCustomAffiliation(result.value);
+    }
+    persistAffiliations(
+      isImsStudent,
+      isSourceCodeAcademia,
+      isVsila,
+      result.value,
+    );
   }
 
   function onPrefClick(key: PreferenceKey) {
@@ -276,7 +312,12 @@ export function ProfileSettingsModal({
                       onChange={(event) => {
                         const next = event.target.checked;
                         setIsImsStudent(next);
-                        persistAffiliations(next, isSourceCodeAcademia);
+                        persistAffiliations(
+                          next,
+                          isSourceCodeAcademia,
+                          isVsila,
+                          customAffiliation,
+                        );
                       }}
                       className="mt-0.5 size-4 accent-[var(--accent)]"
                     />
@@ -296,7 +337,12 @@ export function ProfileSettingsModal({
                       onChange={(event) => {
                         const next = event.target.checked;
                         setIsSourceCodeAcademia(next);
-                        persistAffiliations(isImsStudent, next);
+                        persistAffiliations(
+                          isImsStudent,
+                          next,
+                          isVsila,
+                          customAffiliation,
+                        );
                       }}
                       className="mt-0.5 size-4 accent-[var(--accent)]"
                     />
@@ -309,6 +355,57 @@ export function ProfileSettingsModal({
                       </span>
                     </span>
                   </label>
+                  <label className="flex cursor-pointer items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={isVsila}
+                      onChange={(event) => {
+                        const next = event.target.checked;
+                        setIsVsila(next);
+                        persistAffiliations(
+                          isImsStudent,
+                          isSourceCodeAcademia,
+                          next,
+                          customAffiliation,
+                        );
+                      }}
+                      className="mt-0.5 size-4 accent-[var(--accent)]"
+                    />
+                    <span>
+                      <span className="block text-sm font-medium text-foreground">
+                        Vsila
+                      </span>
+                      <span className="mt-0.5 block text-[11px] text-muted">
+                        Verified Vsila badge on Discover cards.
+                      </span>
+                    </span>
+                  </label>
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="custom-affiliation"
+                      className="block text-sm font-medium text-foreground"
+                    >
+                      Custom
+                    </label>
+                    <input
+                      id="custom-affiliation"
+                      type="text"
+                      value={customAffiliation}
+                      onChange={(event) => {
+                        setCustomAffiliation(event.target.value);
+                        if (customError) setCustomError(null);
+                      }}
+                      onBlur={handleCustomBlur}
+                      placeholder="e.g. Design Collective"
+                      className="w-full rounded-[10px] border border-border bg-[color-mix(in_oklch,var(--bg)_40%,transparent)] px-3 py-2 text-sm text-foreground outline-none transition-[border-color] focus:border-accent"
+                    />
+                    <p className="text-[11px] text-muted">Up to 3 words</p>
+                    {customError ? (
+                      <p className="text-[11px] text-[oklch(0.78_0.12_25)]">
+                        {customError}
+                      </p>
+                    ) : null}
+                  </div>
                 </fieldset>
               ) : null}
 

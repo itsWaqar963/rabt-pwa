@@ -36,6 +36,8 @@ export type UserCardProps = {
   onHide?: () => void;
   isImsStudent?: boolean;
   isSourceCodeAcademia?: boolean;
+  isVsila?: boolean;
+  customAffiliation?: string;
   isOnline?: boolean;
 };
 
@@ -70,6 +72,8 @@ export function UserCard({
   onHide,
   isImsStudent = false,
   isSourceCodeAcademia = false,
+  isVsila = false,
+  customAffiliation = "",
   isOnline = false,
 }: UserCardProps) {
   const reducedMotion = useReducedMotion();
@@ -129,6 +133,8 @@ export function UserCard({
             <AffiliationBadges
               isImsStudent={isImsStudent}
               isSourceCodeAcademia={isSourceCodeAcademia}
+              isVsila={isVsila}
+              customAffiliation={customAffiliation}
             />
           </div>
           <p className="mt-[3px] text-[11px] text-muted">{subline}</p>

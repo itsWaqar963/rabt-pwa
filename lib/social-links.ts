@@ -171,3 +171,18 @@ export function trimSocialUrls(urls: SocialUrls): SocialUrls {
   }
   return next;
 }
+
+export type DiscoveryLinks = {
+  github?: string;
+  linkedin?: string;
+  contact?: string;
+};
+
+/** Map profile social_urls to Discover card / popup link fields. */
+export function socialUrlsToDiscoveryLinks(urls: SocialUrls): DiscoveryLinks {
+  return {
+    github: resolveSocialHref("github", urls.github) ?? undefined,
+    linkedin: resolveSocialHref("linkedin", urls.linkedin) ?? undefined,
+    contact: resolveSocialHref("whatsapp", urls.whatsapp) ?? undefined,
+  };
+}

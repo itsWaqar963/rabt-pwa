@@ -1,6 +1,10 @@
 import type { UserCardProps } from "@/components/ui/UserCard";
 import type { DiscoveryFilters } from "@/lib/discovery-filters";
 import type { MeetupCategory } from "@/lib/meetup-store";
+import {
+  normalizeSocialUrls,
+  socialUrlsToDiscoveryLinks,
+} from "@/lib/social-links";
 
 export type DiscoveryUserLinks = {
   github?: string;
@@ -30,6 +34,9 @@ export type DiscoveryUser = UserCardProps & {
   meetup?: DiscoveryMeetup;
   isImsStudent?: boolean;
   isSourceCodeAcademia?: boolean;
+  isVsila?: boolean;
+  customAffiliation?: string;
+  skills?: string[];
   isOnline?: boolean;
   lastSeenAt?: string;
 };
@@ -60,6 +67,9 @@ export type HostedMeetup = {
   hostIntrovertExtrovert?: number;
   hostIsImsStudent?: boolean;
   hostIsSourceCodeAcademia?: boolean;
+  hostIsVsila?: boolean;
+  hostCustomAffiliation?: string;
+  hostSocialUrls?: ReturnType<typeof normalizeSocialUrls>;
   hostLastSeenAt?: string;
   hostIsOnline?: boolean;
   /** Raw create fields when available */
@@ -165,9 +175,14 @@ export function hostedMeetupToDiscoveryUser(
     personalityScore,
     isImsStudent: meetup.hostIsImsStudent === true,
     isSourceCodeAcademia: meetup.hostIsSourceCodeAcademia === true,
+    isVsila: meetup.hostIsVsila === true,
+    customAffiliation: meetup.hostCustomAffiliation,
+    skills: meetup.hostSkills ?? [],
     isOnline: meetup.hostIsOnline === true,
     lastSeenAt: meetup.hostLastSeenAt,
-    links: {},
+    links: socialUrlsToDiscoveryLinks(
+      meetup.hostSocialUrls ?? normalizeSocialUrls(null),
+    ),
     meetup: {
       id: meetup.id,
       title: meetup.title,

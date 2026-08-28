@@ -178,6 +178,8 @@ export default function DiscoverPage() {
                   meetup={user.meetup}
                   isImsStudent={user.isImsStudent}
                   isSourceCodeAcademia={user.isSourceCodeAcademia}
+                  isVsila={user.isVsila}
+                  customAffiliation={user.customAffiliation}
                   isOnline={user.isOnline === true}
                   primaryAcked={
                     user.meetup
